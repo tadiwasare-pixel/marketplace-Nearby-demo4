@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="Discover local businesses, jobs and matches near you.">
+  <title>Marketplace Nearby | Demo</title>
+  
+  <!-- External Libraries -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    /* ============ CSS ============ */
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{
+      --primary:#2563eb;--primary-dark:#1d4ed8;--primary-light:#dbeafe;
+      --accent:#f59e0b;--accent-dark:#d97706;
+      --success:#10b981;--danger:#ef4444;--dark:#0f172a;
+      --gray-50:#f8fafc;--gray-100:#f1f5f9;--gray-200:#e2e8f0;--gray-300:#cbd5e1;
+      --gray-400:#94a3b8;--gray-500:#64748b;--gray-600:#475569;--gray-700:#334155;
+      --shadow-sm:0 1px 2px 0 rgb(0 0 0/.05);
+      --shadow-md:0 4px 6px -1px rgb(0 0 0/.1),0 2px 4px -2px rgb(0 0 0/.1);
+      --shadow-lg:0 10px 15px -3px rgb(0 0 0/.1),0 4px 6px -4px rgb(0 0 0/.1);
+      --shadow-xl:0 20px 25px -5px rgb(0 0 0/.1),0 8px 10px -6px rgb(0 0 0/.1);
+      --r-sm:16px;--r-md:24px;--r-lg:32px;--r-full:9999px;
+      --deck-h:250px;
+    }
+    html,body{height:100%;margin:0;padding:0}
+    body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#e5e7eb;overflow:hidden;height:100vh;height:100dvh;width:100%;color:var(--dark)}
+    body.modal-open{overflow:hidden}
+
+    #map{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:0;background:#e5e7eb}
+    #mapLoading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;pointer-events:none;font-family:'Plus Jakarta Sans',sans-serif;color:#64748b;font-weight:600;font-size:.9rem;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);transition:opacity .5s}
+    #mapLoading.hidden{opacity:0}
+    .leaflet-top.leaflet-right{top:148px!important;right:10px!important}
+
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%{transform:scale(1);opacity:1}50%{transform:scale(2);opacity:0}100%{transform:scale(1);opacity:0}}
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+    .offline-banner{position:fixed;top:0;left:0;right:0;z-index:4000;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;padding:8px 16px;font-size:.8rem;font-weight:700;text-align:center;transform:translateY(-100%);transition:transform .3s}
+    .offline-banner.visible{transform:translateY(0)}
+
+    .glass-header{position:absolute;top:16px;left:16px;right:16px;z-index:1020;background:rgba(255,255,255,.96);backdrop-filter:blur(16px) saturate(1.2);-webkit-backdrop-filter:blur(16px) saturate(1.2);border-radius:var(--r-lg);padding:12px 18px;box-shadow:var(--shadow-xl);border:1px solid rgba(255,255,255,.7)}
+    .header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .logo-area h1{font-size:1.15rem;font-weight:800;background:linear-gradient(135deg,#0f2b3d,#2563eb,#3b82f6);background-clip:text;-webkit-background-clip:text;color:transparent;letter-spacing:-.5px}
+    .logo-area p{font-size:.65rem;color:var(--gray-500);margin-top:-1px;font-weight:500}
+    .header-actions{display:flex;gap:8px}
+    .icon-btn{background:var(--gray-100);border:none;width:42px;height:42px;border-radius:var(--r-full);font-size:1.1rem;cursor:pointer;color:var(--gray-700);display:inline-flex;align-items:center;justify-content:center;box-shadow:var(--shadow-sm);position:relative;transition:all .2s}
+    .icon-btn:hover{background:var(--gray-200);transform:translateY(-1px)}
+    .icon-btn:active{transform:scale(.94)}
+    .icon-btn .badge{position:absolute;top:-2px;right:-2px;background:var(--danger);color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:var(--r-full);border:2px solid #fff}
+    .search-wrapper{margin-top:10px;position:relative}
+    .search-wrapper input{width:100%;padding:12px 18px 12px 44px;border-radius:var(--r-full);border:none;background:var(--gray-100);font-size:.88rem;outline:none;font-family:inherit;font-weight:500;transition:all .2s;color:var(--dark)}
+    .search-wrapper input::placeholder{color:var(--gray-400)}
+    .search-wrapper input:focus{background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+    .search-wrapper .search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:.95rem;pointer-events:none}
+    .search-wrapper .search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--gray-200);border:none;width:24px;height:24px;border-radius:var(--r-full);color:var(--gray-500);font-size:.7rem;cursor:pointer;display:none;align-items:center;justify-content:center}
+    .search-wrapper .search-clear.visible{display:flex}
+
+    .mode-pill{position:absolute;top:150px;left:50%;transform:translateX(-50%);z-index:1020;display:flex;gap:4px;padding:4px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:var(--r-full);box-shadow:var(--shadow-lg);border:1px solid rgba(255,255,255,.7)}
+    .mode-btn{display:flex;align-items:center;gap:6px;padding:8px 12px;border:none;background:transparent;border-radius:var(--r-full);font-family:inherit;font-weight:700;font-size:.72rem;color:var(--gray-600);cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);white-space:nowrap}
+    .mode-btn i{font-size:.85rem}
+    .mode-btn span{display:none}
+    .mode-btn.active{color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.3)}
+    .mode-btn.active span{display:inline}
+    .mode-btn.active[data-mode="discover"]{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+    .mode-btn.active[data-mode="jobs"]{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 12px rgba(16,185,129,.35)}
+    .mode-btn.active[data-mode="match"]{background:linear-gradient(135deg,#f59e0b,#d97706);box-shadow:0 4px 12px rgba(245,158,11,.35)}
+
+    .card-deck{position:absolute;bottom:0;left:0;right:0;z-index:1015;padding-bottom:env(safe-area-inset-bottom);pointer-events:none;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+    .card-deck.hidden{transform:translateY(120%);pointer-events:none}
+    .deck-header{display:flex;justify-content:space-between;align-items:center;padding:8px 20px;pointer-events:auto}
+    .deck-count{font-size:.72rem;font-weight:800;color:#fff;background:rgba(15,23,42,.85);backdrop-filter:blur(8px);padding:5px 12px;border-radius:var(--r-full);letter-spacing:.3px}
+    .deck-filter-btn{background:rgba(15,23,42,.85);backdrop-filter:blur(8px);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:.75rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+    .deck-track{display:flex;gap:12px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:0 calc(50vw - 145px) 16px;pointer-events:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;height:var(--deck-h)}
+    .deck-track::-webkit-scrollbar{display:none}
+    .deck-empty{flex:0 0 290px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fff;border-radius:var(--r-md);padding:24px;text-align:center;color:var(--gray-400);box-shadow:var(--shadow-xl)}
+    .deck-empty i{font-size:2rem;color:var(--gray-300)}
+    .deck-empty p{font-size:.82rem;color:var(--gray-600);font-weight:600}
+    .deck-card{flex:0 0 290px;scroll-snap-align:center;background:#fff;border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow-xl);cursor:pointer;transition:transform .2s,box-shadow .2s;display:flex;flex-direction:column;pointer-events:auto;border:1.5px solid transparent}
+    .deck-card:hover{transform:translateY(-2px)}
+    .deck-card.active{border-color:var(--primary);box-shadow:0 20px 40px rgba(37,99,235,.25),var(--shadow-xl)}
+    .deck-card-image{height:100px;background:linear-gradient(135deg,var(--gray-100),var(--gray-50));position:relative;overflow:hidden;flex-shrink:0}
+    .deck-card-image img{width:100%;height:100%;object-fit:cover}
+    .deck-card-image .ph{display:flex;align-items:center;justify-content:center;height:100%;color:var(--gray-300);font-size:2rem}
+    .deck-card-cat-badge{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.95);color:var(--primary-dark);font-size:.62rem;font-weight:800;padding:3px 10px;border-radius:var(--r-full);text-transform:uppercase;letter-spacing:.4px}
+    .deck-card-body{padding:10px 14px 12px;flex:1;display:flex;flex-direction:column;gap:6px;min-height:0}
+    .deck-card-title{font-size:.92rem;font-weight:800;color:var(--dark);line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+    .deck-card-desc{font-size:.72rem;color:var(--gray-500);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+    .deck-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:auto;gap:8px}
+    .deck-card-dist{font-size:.72rem;color:var(--primary);font-weight:700;display:inline-flex;align-items:center;gap:4px}
+    .deck-card-dist.unknown{color:var(--gray-500)}
+    .deck-card-actions{display:flex;gap:4px}
+    .deck-card-actions button{width:30px;height:30px;border-radius:50%;border:none;background:var(--gray-100);color:var(--gray-500);font-size:.8rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .15s}
+    .deck-card-actions button:active{transform:scale(.9)}
+    .deck-card-actions button.fav.favorited{background:#fef2f2;color:var(--danger)}
+    .deck-card-actions button.view{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
+
+    .bottom-sheet{position:absolute;bottom:0;left:0;right:0;z-index:1015;background:#fff;border-radius:var(--r-lg) var(--r-lg) 0 0;height:60vh;display:none;flex-direction:column;box-shadow:0 -16px 40px rgba(0,0,0,.12);padding-bottom:env(safe-area-inset-bottom);transition:height .3s cubic-bezier(.4,0,.2,1)}
+    .bottom-sheet.visible{display:flex}
+    .bottom-sheet.expanded{height:88vh}
+    .sheet-handle{width:40px;height:4px;background:var(--gray-300);border-radius:var(--r-full);margin:12px auto 8px;cursor:grab;flex-shrink:0}
+    .sheet-header{padding:0 20px 10px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+    .sheet-title{font-size:1.1rem;font-weight:800;color:var(--dark)}
+    .sheet-count{font-size:.72rem;font-weight:700;background:var(--primary-light);color:var(--primary);padding:4px 12px;border-radius:var(--r-full)}
+    .sheet-content{flex:1;overflow-y:auto;padding:4px 16px 100px;-webkit-overflow-scrolling:touch}
+    .sheet-content::-webkit-scrollbar{width:4px}
+    .sheet-content::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:var(--r-full)}
+
+    .fab-add{position:absolute;right:20px;width:56px;height:56px;background:linear-gradient(145deg,#3b82f6,#2563eb);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;box-shadow:0 12px 28px rgba(37,99,235,.4);cursor:pointer;z-index:1030;border:none;transition:all .25s cubic-bezier(.4,0,.2,1)}
+    .fab-add:hover{transform:scale(1.08) rotate(90deg)}
+    .fab-add:active{transform:scale(.94)}
+    .fab-add.jobs{background:linear-gradient(145deg,#10b981,#059669);box-shadow:0 12px 28px rgba(16,185,129,.4)}
+
+    body[data-mode="discover"] .fab-add{bottom:calc(var(--deck-h) + 40px + env(safe-area-inset-bottom))}
+    body[data-mode="jobs"] .fab-add,body[data-mode="match"] .fab-add{bottom:calc(60vh + 16px + env(safe-area-inset-bottom))}
+    body[data-mode="jobs"][data-sheet-expanded="true"] .fab-add,
+    body[data-mode="match"][data-sheet-expanded="true"] .fab-add{bottom:calc(88vh + 16px + env(safe-area-inset-bottom))}
+
+    .recenter-btn{position:absolute;left:20px;bottom:calc(var(--deck-h) + 104px + env(safe-area-inset-bottom));background:#fff;border-radius:var(--r-full);padding:10px 16px;box-shadow:var(--shadow-lg);z-index:1020;border:none;font-weight:700;cursor:pointer;font-family:inherit;font-size:.82rem;color:var(--gray-700);display:flex;align-items:center;gap:6px;transition:all .2s}
+    .recenter-btn:active{transform:scale(.96)}
+    body[data-mode="jobs"] .recenter-btn,body[data-mode="match"] .recenter-btn{display:none}
+
+    .job-card{background:#fff;border-radius:var(--r-md);padding:16px;margin-bottom:12px;border:1px solid var(--gray-100);box-shadow:var(--shadow-sm);cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+    .job-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+    .job-card.matched{border:2px solid rgba(245,158,11,.4)}
+    .job-card.matched::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#fbbf24,#f59e0b);background-size:200% auto;animation:shimmer 2s linear infinite}
+    .job-card .job-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+    .job-card .job-title{font-weight:800;font-size:1rem;color:var(--dark);line-height:1.3;flex:1}
+    .job-card .job-company{font-size:.82rem;color:var(--gray-600);font-weight:600;margin-bottom:4px}
+    .job-card .job-company i{color:var(--gray-400);margin-right:5px}
+    .job-card .job-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+    .job-type-pill{font-size:.66rem;padding:4px 10px;border-radius:var(--r-full);font-weight:700;letter-spacing:.2px;text-transform:uppercase;background:var(--primary-light);color:var(--primary-dark)}
+    .salary-badge{font-size:.72rem;color:var(--success);background:#d1fae5;padding:4px 10px;border-radius:var(--r-full);font-weight:700;display:inline-flex;align-items:center;gap:4px}
+    .job-card .job-desc{font-size:.82rem;color:var(--gray-600);margin:8px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.5}
+    .job-card .job-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px}
+    .job-card .job-location{font-size:.75rem;color:var(--gray-500);display:inline-flex;align-items:center;gap:4px}
+    .job-card .apply-btn{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:8px 16px;border-radius:var(--r-full);font-weight:700;font-size:.78rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:all .2s}
+    .job-card .apply-btn:hover{transform:translateY(-1px)}
+    .job-card .apply-btn.applied{background:var(--gray-100);color:var(--gray-600)}
+
+    .match-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--r-full);font-size:.68rem;font-weight:800;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
+    .match-badge.excellent{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+    .match-badge.good{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
+    .match-badge.fair{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff}
+    .match-badge.low{background:var(--gray-200);color:var(--gray-600)}
+
+    .match-radar{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:var(--r-md);padding:16px;margin-bottom:16px;border:1.5px solid rgba(245,158,11,.3);position:relative;overflow:hidden}
+    .match-radar::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#fbbf24,#f59e0b);background-size:200% auto;animation:shimmer 2s linear infinite}
+    .match-radar-ring{width:76px;height:76px;border-radius:50%;background:conic-gradient(#10b981 0% var(--match-pct,0%),rgba(255,255,255,.4) var(--match-pct,0%) 100%);display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+    .match-radar-ring::before{content:'';position:absolute;inset:6px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:50%}
+    .match-radar-pct{position:relative;font-size:1.15rem;font-weight:800;color:var(--dark)}
+    .match-radar-body{min-width:0;flex:1}
+    .match-radar-label{font-size:.66rem;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.5px}
+    .match-radar-title{font-size:.92rem;font-weight:800;color:var(--dark);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .match-radar-sub{font-size:.72rem;color:#78350f;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:2000;display:flex;align-items:flex-end;justify-content:center;visibility:hidden;opacity:0;transition:all .3s}
+    .modal-overlay.active{visibility:visible;opacity:1}
+    .modal-overlay.active .modal-card{transform:translateY(0)}
+    .modal-card{background:#fff;max-width:100%;width:100%;max-height:88vh;border-radius:var(--r-lg) var(--r-lg) 0 0;overflow-y:auto;padding:24px 22px calc(32px + env(safe-area-inset-bottom));position:relative;box-shadow:0 -20px 60px rgba(0,0,0,.3);transform:translateY(100%);transition:transform .3s;-webkit-overflow-scrolling:touch}
+    .modal-card::-webkit-scrollbar{width:4px}
+    .modal-card::-webkit-scrollbar-thumb{background:var(--gray-300);border-radius:var(--r-full)}
+    .modal-card.modal-wide{max-width:500px;border-radius:var(--r-lg);margin:auto 16px;transform:translateY(20px)}
+    .modal-overlay.active .modal-card.modal-wide{transform:translateY(0)}
+    .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;font-weight:800;font-size:1.15rem}
+    .modal-close{background:var(--gray-100);border:none;width:36px;height:36px;border-radius:var(--r-full);font-size:1rem;cursor:pointer;color:var(--gray-600);display:inline-flex;align-items:center;justify-content:center;transition:all .15s}
+    .modal-close:hover{background:var(--gray-200);transform:rotate(90deg)}
+
+    .form-group{margin-bottom:18px}
+    label{font-size:.82rem;font-weight:700;display:block;margin-bottom:7px;color:var(--gray-700)}
+    input,select,textarea{width:100%;padding:13px 18px;border-radius:var(--r-full);border:1.5px solid var(--gray-200);font-family:inherit;background:var(--gray-50);transition:all .2s;font-size:.9rem;color:var(--dark)}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);background:#fff;box-shadow:0 0 0 4px rgba(59,130,246,.12)}
+    textarea{border-radius:var(--r-md);resize:vertical;min-height:80px}
+    select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:18px;padding-right:42px}
+
+    .btn-primary{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none;padding:14px;border-radius:var(--r-full);font-weight:700;width:100%;cursor:pointer;font-size:.95rem;font-family:inherit;transition:all .2s;box-shadow:0 4px 12px rgba(37,99,235,.25)}
+    .btn-primary:hover{transform:translateY(-1px)}
+    .btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+    .btn-secondary{background:var(--gray-100);color:var(--gray-700);border:none;padding:14px;border-radius:var(--r-full);font-weight:700;cursor:pointer;font-family:inherit;font-size:.95rem}
+    .btn-secondary:hover{background:var(--gray-200)}
+    .flex-btns{display:flex;gap:12px;margin-top:20px}
+    .flex-btns>button{flex:1}
+
+    .tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--gray-100);margin-bottom:20px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tab-bar::-webkit-scrollbar{display:none}
+    .tab{padding:10px 16px;background:none;border:none;font-weight:700;font-size:.83rem;color:var(--gray-500);cursor:pointer;white-space:nowrap;position:relative;font-family:inherit}
+    .tab.active{color:var(--primary)}
+    .tab.active::after{content:'';position:absolute;bottom:-2px;left:8px;right:8px;height:2.5px;background:var(--primary);border-radius:var(--r-full)}
+    .tab-pane{display:none}
+    .tab-pane.active{display:block;animation:fadeIn .3s ease}
+
+    .info-note{background:#fef9c3;padding:14px 18px;border-radius:var(--r-md);font-size:.82rem;margin:12px 0;color:#713f12;font-weight:500;line-height:1.5}
+
+    .image-upload-area{border:2px dashed var(--gray-300);border-radius:var(--r-md);padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--gray-50)}
+    .image-upload-area:hover{border-color:var(--primary);background:var(--primary-light)}
+    .image-upload-area i{font-size:1.8rem;color:var(--gray-400);margin-bottom:6px;display:block}
+    .image-upload-area p{font-size:.82rem;color:var(--gray-600);font-weight:600}
+    .image-upload-area small{font-size:.7rem;color:var(--gray-400)}
+    .image-preview-thumb{width:100%;height:150px;border-radius:var(--r-md);object-fit:cover;margin-top:12px;display:none}
+    .upload-progress{margin-top:10px;height:6px;background:var(--gray-200);border-radius:var(--r-full);overflow:hidden;display:none}
+    .upload-progress.visible{display:block}
+    .upload-progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-dark));width:0%;transition:width .2s}
+
+    .location-picker{background:var(--gray-50);border-radius:var(--r-md);padding:16px;margin:12px 0;border:1.5px solid var(--gray-200)}
+    .location-preview{font-size:.82rem;background:var(--primary-light);padding:10px 14px;border-radius:var(--r-full);margin-top:10px;text-align:center;color:var(--primary-dark);font-weight:600}
+    .map-pick-btn{background:var(--primary);color:#fff;border:none;padding:12px;border-radius:var(--r-full);font-size:.85rem;font-weight:700;margin-top:8px;width:100%;cursor:pointer;font-family:inherit}
+    #tempMapContainer{height:300px;width:100%;border-radius:var(--r-md);margin:10px 0;overflow:hidden}
+
+    .detail-hero{width:100%;height:180px;border-radius:var(--r-md);object-fit:cover;margin-bottom:16px;background:var(--gray-100)}
+    .detail-hero-placeholder{width:100%;height:180px;border-radius:var(--r-md);background:linear-gradient(135deg,var(--gray-100),var(--gray-50));margin-bottom:16px;display:flex;align-items:center;justify-content:center;color:var(--gray-300);font-size:3rem}
+    .detail-title{font-size:1.3rem;font-weight:800;color:var(--dark);line-height:1.3;margin-bottom:8px}
+    .detail-rating{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+    .detail-rating .stars{color:#fbbf24;font-size:1rem}
+    .detail-rating .score{font-weight:800;font-size:1.1rem;color:var(--dark)}
+    .detail-rating .count{color:var(--gray-500);font-size:.85rem}
+    .detail-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+    .detail-meta-item{background:var(--gray-50);padding:12px;border-radius:var(--r-sm);font-size:.82rem}
+    .detail-meta-item i{color:var(--primary);margin-right:6px;width:16px}
+    .detail-meta-item strong{display:block;color:var(--gray-500);font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+    .detail-description{font-size:.9rem;line-height:1.7;color:var(--gray-600);margin-bottom:16px;padding:14px;background:var(--gray-50);border-radius:var(--r-sm)}
+    .detail-section-title{font-size:.85rem;font-weight:800;color:var(--gray-700);margin:16px 0 10px;text-transform:uppercase;letter-spacing:.8px}
+
+    .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+    .action-btn{padding:14px;border-radius:var(--r-full);border:none;font-family:inherit;font-weight:700;font-size:.88rem;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+    .action-btn:hover{transform:translateY(-2px)}
+    .action-btn.call{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff}
+    .action-btn.whatsapp{background:linear-gradient(135deg,#25d366,#128c7e);color:#fff}
+    .action-btn.directions{background:var(--gray-100);color:var(--gray-700)}
+    .action-btn.share{background:var(--primary-light);color:var(--primary-dark)}
+
+    .review-card{background:var(--gray-50);border-radius:var(--r-sm);padding:14px;margin-bottom:10px}
+    .review-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .reviewer-name{font-weight:700;font-size:.88rem;color:var(--dark)}
+    .review-date{font-size:.72rem;color:var(--gray-400)}
+    .review-stars{color:#fbbf24;font-size:.8rem;margin-bottom:6px}
+    .review-text{font-size:.85rem;color:var(--gray-600);line-height:1.5}
+    .review-form{background:#fff;border:1.5px solid var(--gray-200);border-radius:var(--r-md);padding:16px;margin-bottom:16px}
+    .star-rating-input{display:flex;gap:8px;margin-bottom:12px}
+    .star-rating-input i{font-size:1.7rem;color:var(--gray-300);cursor:pointer;transition:all .15s}
+    .star-rating-input i:hover,.star-rating-input i.active{color:#fbbf24;transform:scale(1.15)}
+    .detail-loading{display:flex;justify-content:center;padding:60px}
+    .spinner{width:40px;height:40px;border:3px solid var(--gray-200);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
+
+    .skill-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .skill-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:var(--primary-light);color:var(--primary-dark);border-radius:var(--r-full);font-size:.78rem;font-weight:600}
+    .skill-chip button{background:none;border:none;color:var(--primary);cursor:pointer;font-size:.9rem;padding:0;line-height:1}
+    .checkbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+    .checkbox-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--r-full);cursor:pointer;font-size:.78rem;font-weight:600;color:var(--gray-700);transition:all .15s}
+    .checkbox-item:hover{border-color:var(--primary)}
+    .checkbox-item input{width:auto}
+    .checkbox-item.checked{background:var(--primary-light);border-color:var(--primary);color:var(--primary-dark)}
+
+    .apply-method{display:flex;align-items:center;gap:14px;padding:14px;background:var(--gray-50);border-radius:var(--r-md);margin-bottom:10px;cursor:pointer;transition:all .2s;border:2px solid transparent}
+    .apply-method:hover{background:#fff;border-color:var(--primary);transform:translateY(-1px)}
+    .apply-method .apply-icon{width:42px;height:42px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#fff;flex-shrink:0}
+    .apply-method .apply-icon.url{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+    .apply-method .apply-icon.email{background:linear-gradient(135deg,#f59e0b,#d97706)}
+    .apply-method .apply-icon.whatsapp{background:linear-gradient(135deg,#25d366,#128c7e)}
+    .apply-method .apply-info{flex:1;min-width:0}
+    .apply-method .apply-title{font-weight:800;font-size:.88rem;color:var(--dark)}
+    .apply-method .apply-desc{font-size:.72rem;color:var(--gray-500);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    .empty-state{text-align:center;padding:40px 20px;color:var(--gray-400)}
+    .empty-state i{font-size:3rem;margin-bottom:12px;display:block;color:var(--gray-300)}
+    .empty-state h3{font-size:1rem;color:var(--gray-600);font-weight:700;margin-bottom:6px}
+    .empty-state p{font-size:.85rem;max-width:240px;margin:0 auto 16px}
+
+    .toast-container{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-20px);z-index:3000;display:flex;flex-direction:column;gap:8px;pointer-events:none;opacity:0;transition:all .3s}
+    .toast-container.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast{background:var(--dark);color:#fff;padding:12px 20px;border-radius:var(--r-full);font-size:.85rem;font-weight:600;box-shadow:var(--shadow-xl);display:flex;align-items:center;gap:8px;animation:slideDown .3s ease;pointer-events:auto;max-width:90vw}
+    .toast.success{background:linear-gradient(135deg,#10b981,#059669)}
+    .toast.error{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    .toast.info{background:linear-gradient(135deg,#3b82f6,#2563eb)}
+
+    .user-location-pulse{position:relative}
+    .user-location-pulse::after{content:'';position:absolute;top:50%;left:50%;width:18px;height:18px;margin:-9px 0 0 -9px;background:#3b82f6;border-radius:50%;animation:pulse 2s ease-out infinite;z-index:-1}
+
+    input[type="range"]{-webkit-appearance:none;appearance:none;height:8px;border-radius:var(--r-full);background:var(--gray-200);outline:none;padding:0;border:none}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#2563eb);cursor:pointer;box-shadow:0 2px 8px rgba(37,99,235,.35);border:3px solid #fff}
+
+    .profile-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--primary-light),var(--primary));display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:var(--primary);margin:0 auto 12px}
+    .profile-email{text-align:center;font-weight:700;font-size:.95rem;color:var(--dark);margin-bottom:4px}
+    .profile-status{text-align:center;font-size:.78rem;color:var(--gray-500);margin-bottom:16px}
+
+    .biz-dashboard{background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:var(--r-md);padding:16px;margin-bottom:16px;border:1.5px solid rgba(37,99,235,.2)}
+    .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+    .stat-box{background:#fff;border-radius:var(--r-sm);padding:10px;text-align:center}
+    .stat-box .num{font-size:1.1rem;font-weight:800;color:var(--primary)}
+    .stat-box .lbl{font-size:.62rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-top:2px}
+
+    .jobs-empty{text-align:center;padding:32px 20px}
+    .jobs-empty i{font-size:3rem;color:var(--gray-300);margin-bottom:12px;display:block}
+    .jobs-empty h3{font-size:1rem;color:var(--gray-600);font-weight:700;margin-bottom:6px}
+    .jobs-empty p{font-size:.82rem;color:var(--gray-400);margin-bottom:16px}
+
+    .report-btn{background:none;border:none;color:var(--gray-400);font-size:.75rem;cursor:pointer;font-family:inherit;font-weight:500;margin-top:12px;transition:color .15s}
+    .report-btn:hover{color:var(--danger)}
+
+    @media (min-width:768px){
+      .glass-header{left:50%;transform:translateX(-50%);max-width:480px}
+      .mode-pill{left:50%}
+    }
+  </style>
+</head>
+<body data-mode="discover">
+<div class="offline-banner" id="offlineBanner"><i class="fas fa-wifi"></i> You are offline</div>
+<div id="map"></div>
+<div id="mapLoading">Loading map…</div>
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="glass-header">
+  <div class="header-row">
+    <div class="logo-area">
+      <h1>Marketplace Nearby</h1>
+      <p>Discover · Jobs · Match</p>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="filterBtn" aria-label="Filter"><i class="fas fa-sliders-h"></i></button>
+      <button class="icon-btn" id="profileBtn" aria-label="Profile"><i class="fas fa-user-circle"></i><span class="badge" id="favBadge" style="display:none;">0</span></button>
+    </div>
+  </div>
+  <div class="search-wrapper">
+    <i class="fas fa-search search-icon"></i>
+    <input type="text" id="globalSearch" placeholder="Search nearby listings..." autocomplete="off">
+    <button class="search-clear" id="searchClear" aria-label="Clear"><i class="fas fa-times"></i></button>
+  </div>
+</div>
+
+<div class="mode-pill" role="tablist">
+  <button class="mode-btn active" data-mode="discover" role="tab"><i class="fas fa-compass"></i><span>Discover</span></button>
+  <button class="mode-btn" data-mode="jobs" role="tab"><i class="fas fa-briefcase"></i><span>Jobs</span></button>
+  <button class="mode-btn" data-mode="match" role="tab"><i class="fas fa-magic"></i><span>Match</span></button>
+</div>
+
+<div class="card-deck" id="cardDeck">
+  <div class="deck-header">
+    <span class="deck-count" id="deckCounter">0 of 0</span>
+    <button class="deck-filter-btn" id="deckFilterBtn" aria-label="Filter"><i class="fas fa-sliders-h"></i></button>
+  </div>
+  <div class="deck-track" id="deckTrack"></div>
+</div>
+
+<div class="bottom-sheet" id="bottomSheet">
+  <div class="sheet-handle" id="sheetHandle"></div>
+  <div class="sheet-header">
+    <span class="sheet-title" id="sheetTitle">Jobs</span>
+    <span class="sheet-count" id="sheetCount">0</span>
+  </div>
+  <div class="sheet-content" id="sheetContent"></div>
+</div>
+
+<button class="fab-add" id="fabAdd" aria-label="Add"><i class="fas fa-plus"></i></button>
+<button class="recenter-btn" id="recenterBtn"><i class="fas fa-location-arrow"></i> Me</button>
+
+<!-- Modals -->
+<div id="filterModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header"><span><i class="fas fa-sliders-h"></i> Filter</span><button class="modal-close close-modal">&times;</button></div>
+    <div class="form-group"><label>Category</label><select id="filterCat"><option value="">All Categories</option><option>Food & Beverages</option><option>Electronics</option><option>Fashion</option><option>Tutoring</option><option>Services</option><option>Real Estate</option><option>Entertainment</option><option>Health & Beauty</option><option>Automotive</option><option>Home & Garden</option></select></div>
+    <div class="form-group"><label>Max distance: <strong id="distLabel" style="color:var(--primary);">10 km</strong></label><input type="range" id="filterDist" min="1" max="50" value="10" step="1"></div>
+    <div class="form-group"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;"><input type="checkbox" id="openNow" style="width:auto;"> <span>Open now only</span></label></div>
+    <div class="flex-btns"><button class="btn-secondary" id="resetFiltersBtn">Reset</button><button class="btn-primary" id="applyFiltersBtn">Apply</button></div>
+  </div>
+</div>
+
+<div id="profileModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header"><span><i class="fas fa-user-circle"></i> My Account</span><button class="modal-close close-modal">&times;</button></div>
+    <div id="profileContent"></div>
+  </div>
+</div>
+
+<div id="addListingModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header"><span id="addModalTitle"><i class="fas fa-plus-circle"></i> New listing</span><button class="modal-close close-modal">&times;</button></div>
+    <div class="tab-bar">
+      <button class="tab active" data-tab="basicTab">Basic</button>
+      <button class="tab" data-tab="detailsTab">Details</button>
+      <button class="tab" data-tab="locationTab">Location</button>
+    </div>
+    <div id="basicTab" class="tab-pane active">
+      <div class="form-group"><label>Name *</label><input id="listingTitle" maxlength="100" placeholder="Business or product name"></div>
+      <div class="form-group"><label>Category *</label><select id="listingCat"><option value="">Select</option><option>Food & Beverages</option><option>Electronics</option><option>Fashion</option><option>Tutoring</option><option>Services</option><option>Real Estate</option><option>Entertainment</option><option>Health & Beauty</option><option>Automotive</option><option>Home & Garden</option></select></div>
+      <div class="form-group"><label>Description *</label><textarea id="listingDesc" rows="3" maxlength="2000" placeholder="What do you offer?"></textarea></div>
+      <div class="form-group">
+        <label>Photo</label>
+        <div class="image-upload-area" id="imageUploadArea"><i class="fas fa-cloud-upload-alt"></i><p>Tap to upload</p><small>Max 5MB</small></div>
+        <input type="file" id="imageInput" accept="image/*" style="display:none;">
+        <img id="imagePreviewThumb" class="image-preview-thumb" alt="">
+        <div class="upload-progress" id="uploadProgress"><div class="upload-progress-bar" id="uploadProgressBar"></div></div>
+      </div>
+      <div class="form-group"><label>Or Image URL</label><input id="listingImage" placeholder="https://..."></div>
+    </div>
+    <div id="detailsTab" class="tab-pane">
+      <div class="form-group"><label>Phone / WhatsApp *</label><input id="listingPhone" placeholder="+263 77 123 4567"></div>
+      <div class="form-group"><label>Email</label><input id="listingEmail" placeholder="contact@example.com"></div>
+      <div class="form-group"><label>Website</label><input id="listingWeb" placeholder="https://..."></div>
+      <div class="form-group"><label>Hours</label><input id="listingHours" placeholder="Mon-Fri: 8AM-6PM"></div>
+      <div class="form-group"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;"><input type="checkbox" id="listingIsOpen" style="width:auto;"> <span>Currently open</span></label></div>
+    </div>
+    <div id="locationTab" class="tab-pane">
+      <div class="location-picker">
+        <label><i class="fas fa-map-pin"></i> Location</label>
+        <button type="button" class="map-pick-btn" id="openLocationPickerBtn"><i class="fas fa-hand-pointer"></i> Pick on map</button>
+        <div class="location-preview" id="locationPreview">Using current location</div>
+        <input type="hidden" id="listingLat"><input type="hidden" id="listingLng">
+      </div>
+    </div>
+    <div class="flex-btns"><button class="btn-secondary close-modal">Cancel</button><button class="btn-primary" id="publishBtn"><i class="fas fa-paper-plane"></i> Publish</button></div>
+  </div>
+</div>
+
+<div id="detailsModal" class="modal-overlay">
+  <div class="modal-card" style="max-height:92vh;">
+    <div class="modal-header"><span id="detailTitle">Listing</span><button class="modal-close close-modal">&times;</button></div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<div id="locationPickerModal" class="modal-overlay">
+  <div class="modal-card modal-wide">
+    <div class="modal-header"><span><i class="fas fa-map-pin"></i> Drag pin</span><button class="modal-close close-modal" id="closePickerBtn">&times;</button></div>
+    <div id="tempMapContainer"></div>
+    <div class="flex-btns"><button class="btn-secondary" id="cancelPickBtn">Cancel</button><button class="btn-primary" id="confirmPickBtn"><i class="fas fa-check"></i> Confirm</button></div>
+  </div>
+</div>
+
+<div id="portfolioModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header"><span><i class="fas fa-id-card"></i> My Portfolio</span><button class="modal-close close-modal">&times;</button></div>
+    <div class="tab-bar">
+      <button class="tab active" data-tab="portfolioBasics">Profile</button>
+      <button class="tab" data-tab="portfolioSkills">Skills</button>
+      <button class="tab" data-tab="portfolioPrefs">Preferences</button>
+    </div>
+    <div id="portfolioBasics" class="tab-pane active">
+      <div class="form-group"><label>Full Name *</label><input id="pfName" maxlength="80" placeholder="John Moyo"></div>
+      <div class="form-group"><label>Headline *</label><input id="pfHeadline" maxlength="120" placeholder="Full-stack Developer · 3 years"></div>
+      <div class="form-group"><label>Bio</label><textarea id="pfBio" rows="3" maxlength="600" placeholder="Tell employers about yourself..."></textarea></div>
+      <div class="form-group"><label>Years of Experience</label><input id="pfYears" type="number" min="0" max="50" placeholder="3"></div>
+      <div class="form-group"><label>Education</label><select id="pfEducation"><option value="">Select</option><option>High School</option><option>Certificate / Diploma</option><option>Bachelor's Degree</option><option>Master's Degree</option><option>PhD</option><option>Self-taught</option></select></div>
+      <div class="form-group"><label>Location</label><button type="button" class="map-pick-btn" id="portfolioPickLocationBtn"><i class="fas fa-hand-pointer"></i> Pick on map</button><div class="location-preview" id="portfolioLocationPreview">Using current location</div><input type="hidden" id="pfLat"><input type="hidden" id="pfLng"></div>
+      <div class="form-group"><label>Contact Email</label><input id="pfEmail" type="email" placeholder="you@example.com"></div>
+      <div class="form-group"><label>Phone / WhatsApp</label><input id="pfPhone" placeholder="+263 77 123 4567"></div>
+    </div>
+    <div id="portfolioSkills" class="tab-pane">
+      <div class="form-group"><label>Skills (type + Enter)</label><input id="pfSkillInput" placeholder="JavaScript, customer service..."><div class="skill-chips" id="pfSkillChips"></div></div>
+      <div class="info-note">💡 Add 5–10 skills — this powers your job matches.</div>
+    </div>
+    <div id="portfolioPrefs" class="tab-pane">
+      <div class="form-group"><label>Preferred Job Types</label>
+        <div class="checkbox-grid" id="pfJobTypes">
+          <label class="checkbox-item"><input type="checkbox" value="Full-time"> Full-time</label>
+          <label class="checkbox-item"><input type="checkbox" value="Part-time"> Part-time</label>
+          <label class="checkbox-item"><input type="checkbox" value="Contract"> Contract</label>
+          <label class="checkbox-item"><input type="checkbox" value="Internship"> Internship</label>
+          <label class="checkbox-item"><input type="checkbox" value="Remote"> Remote</label>
+        </div>
+      </div>
+      <div class="form-group"><label>Preferred Categories</label>
+        <div class="checkbox-grid" id="pfCategories">
+          <label class="checkbox-item"><input type="checkbox" value="Technology"> Technology</label>
+          <label class="checkbox-item"><input type="checkbox" value="Sales"> Sales</label>
+          <label class="checkbox-item"><input type="checkbox" value="Marketing"> Marketing</label>
+          <label class="checkbox-item"><input type="checkbox" value="Customer Service"> Customer Service</label>
+          <label class="checkbox-item"><input type="checkbox" value="Construction"> Construction</label>
+          <label class="checkbox-item"><input type="checkbox" value="Hospitality"> Hospitality</label>
+          <label class="checkbox-item"><input type="checkbox" value="Education"> Education</label>
+          <label class="checkbox-item"><input type="checkbox" value="Healthcare"> Healthcare</label>
+          <label class="checkbox-item"><input type="checkbox" value="Logistics"> Logistics</label>
+          <label class="checkbox-item"><input type="checkbox" value="Finance"> Finance</label>
+        </div>
+      </div>
+    </div>
+    <div class="flex-btns"><button class="btn-secondary close-modal">Cancel</button><button class="btn-primary" id="savePortfolioBtn"><i class="fas fa-save"></i> Save</button></div>
+  </div>
+</div>
+
+<div id="jobDetailModal" class="modal-overlay">
+  <div class="modal-card" style="max-height:92vh;">
+    <div class="modal-header"><span id="jobDetailTitle">Job</span><button class="modal-close close-modal">&times;</button></div>
+    <div id="jobDetailBody"></div>
+  </div>
+</div>
+
+<div id="postJobModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header"><span><i class="fas fa-plus-circle"></i> Post a job</span><button class="modal-close close-modal">&times;</button></div>
+    <div class="form-group"><label>Job Title *</label><input id="jobTitle" maxlength="100" placeholder="Senior Accountant"></div>
+    <div class="form-group"><label>Company *</label><input id="jobCompany" maxlength="80" placeholder="Acme Ltd"></div>
+    <div class="form-group"><label>Category *</label><select id="jobCategory"><option value="">Select</option><option>Technology</option><option>Sales</option><option>Marketing</option><option>Customer Service</option><option>Construction</option><option>Hospitality</option><option>Education</option><option>Healthcare</option><option>Logistics</option><option>Finance</option><option>Other</option></select></div>
+    <div class="form-group"><label>Job Type *</label><select id="jobType"><option value="">Select</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option><option>Remote</option></select></div>
+    <div class="form-group"><label>Description *</label><textarea id="jobDesc" rows="4" maxlength="3000" placeholder="Role, responsibilities, requirements..."></textarea></div>
+    <div class="form-group"><label>Required Skills (comma separated)</label><input id="jobSkills" placeholder="JavaScript, React"></div>
+    <div class="form-group"><label>Salary Range</label><div style="display:flex;gap:8px;"><input id="jobSalaryMin" type="number" placeholder="Min" style="flex:1;"><input id="jobSalaryMax" type="number" placeholder="Max" style="flex:1;"></div></div>
+    <div class="form-group"><label>How to apply *</label><input id="jobApplyUrl" type="url" placeholder="https://company.com/apply"><input id="jobApplyEmail" type="email" placeholder="jobs@company.com" style="margin-top:8px;"><input id="jobApplyPhone" placeholder="+263 77 123 4567" style="margin-top:8px;"></div>
+    <div class="form-group"><label>Location</label><input id="jobLocation" placeholder="Harare CBD"></div>
+    <div class="flex-btns"><button class="btn-secondary close-modal">Cancel</button><button class="btn-primary" id="publishJobBtn"><i class="fas fa-paper-plane"></i> Publish</button></div>
+  </div>
+</div>
+
+<div id="applyModal" class="modal-overlay">
+  <div class="modal-card modal-wide">
+    <div class="modal-header"><span><i class="fas fa-paper-plane"></i> Apply</span><button class="modal-close close-modal">&times;</button></div>
+    <div id="applyBody"></div>
+  </div>
+</div>
+
+<script>
+// ==================== FIREBASE ====================
+// REPLACE WITH YOUR FIREBASE CONFIG (If you have it)
+const firebaseConfig = {
+  apiKey: "AIzaSyBElaR4jxZfihtz-sROcqateMoh2OiBTdo",
+  authDomain: "marketplace-app-5e7f3.firebaseapp.com",
+  projectId: "marketplace-app-5e7f3",
+  storageBucket: "marketplace-app-5e7f3.firebasestorage.app",
+  messagingSenderId: "282520811873",
+  appId: "1:282520811873:web:0a3af7a09d02c9f6196d20"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+const storage = firebase.storage();
+db.enablePersistence({ synchronizeTabs: true }).catch(e => console.warn('[FIRESTORE] Persistence:', e.code));
+
+// ==================== STATE ====================
+let map = null;
+let userMarker = null;
+let userLocation = null;
+let listingsLayer = null;
+let allListings = [];
+let currentUser = null;
+let favorites = JSON.parse(localStorage.getItem('favs_market_v2')) || [];
+let filters = { category: '', maxDist: 10, openNow: false };
+let searchTerm = '';
+let tempPickerMap = null, tempPickerMarker = null;
+let reviewsCache = {};
+let sortBy = localStorage.getItem('sort_market_v2') || 'distance';
+let editingListingId = null;
+let pendingImageFile = null;
+let deepLinkHandled = false;
+let activeMode = 'discover';
+let activeDeckIndex = 0;
+let deckListings = [];
+let pickerContext = 'listing';
+
+let jobs = [];
+let jobsLoaded = false;
+let jobSearchTerm = '';
+let userPortfolio = null;
+let portfolioSkills = [];
+let selectedJob = null;
+let appliedJobs = new Set();
+
+const PAGE_SIZE = 20;
+let lastVisibleDoc = null, hasMore = true;
+let rateLimit = JSON.parse(sessionStorage.getItem('rate_market_v2') || '{}');
+
+// ==================== MOCK DATA (For Presentation) ====================
+const MOCK_LISTINGS = [
+  { id: 'm1', title: "Mama's Kitchen", category: "Food & Beverages", description: "Authentic Zimbabwean cuisine. Try our famous sadza and beef stew. Best in Harare!", phone: "+263 77 111 2222", hours: "Mon-Sat: 9AM-8PM", isOpen: true, lat: -17.824, lng: 31.033, imageUrl: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600&q=80", rating: 4.8, reviewCount: 24, createdBy: 'demo' },
+  { id: 'm2', title: "TechFix Hub", category: "Electronics", description: "Phone screen repairs, laptop upgrades, and networking solutions. Fast and reliable.", phone: "+263 77 333 4444", hours: "Mon-Fri: 8:30AM-5:30PM", isOpen: true, lat: -17.830, lng: 31.045, imageUrl: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=600&q=80", rating: 4.5, reviewCount: 12, createdBy: 'demo' },
+  { id: 'm3', title: "Harare Fashion Boutique", category: "Fashion", description: "Trendy local and imported clothing. We have the latest styles for men and women.", phone: "+263 77 555 6666", hours: "Daily: 10AM-7PM", isOpen: true, lat: -17.815, lng: 31.050, imageUrl: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=600&q=80", rating: 4.9, reviewCount: 45, createdBy: 'demo' },
+  { id: 'm4', title: "Bright Minds Tutoring", category: "Tutoring", description: "Math, Science, and English tutoring for O-Level and A-Level students.", phone: "+263 77 777 8888", hours: "Mon-Sat: 2PM-6PM", isOpen: false, lat: -17.840, lng: 31.025, imageUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600&q=80", rating: 5.0, reviewCount: 8, createdBy: 'demo' },
+  { id: 'm5', title: "Green Garden Services", category: "Services", description: "Landscaping, lawn mowing, and tree trimming services for homes and offices.", phone: "+263 77 999 0000", hours: "Mon-Fri: 7AM-4PM", isOpen: true, lat: -17.800, lng: 31.020, imageUrl: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=600&q=80", rating: 4.7, reviewCount: 19, createdBy: 'demo' }
+];
+
+const MOCK_JOBS = [
+  { id: 'j1', title: "Full Stack Developer", company: "EcoNet Zimbabwe", category: "Technology", type: "Remote", description: "We are looking for a skilled Full Stack Developer to build and maintain our e-commerce platform. Experience with React and Node.js is required.", skills: ["JavaScript", "React", "Node.js", "Firebase"], salaryMin: 800, salaryMax: 1500, applyEmail: "jobs@econet.co.zw", locationName: "Remote", isActive: true, createdBy: 'demo' },
+  { id: 'j2', title: "Sales Representative", company: "Harare Motors", category: "Sales", type: "Full-time", description: "Join our dynamic sales team. You will be responsible for meeting with clients, demonstrating vehicles, and closing sales.", skills: ["Sales", "Negotiation", "Customer Service", "Communication"], salaryMin: 300, salaryMax: 600, applyPhone: "+263 77 123 4567", locationName: "Harare CBD", isActive: true, createdBy: 'demo' },
+  { id: 'j3', title: "Customer Support Agent", company: "Telecom ZW", category: "Customer Service", type: "Part-time", description: "Handle inbound customer queries via phone and email. Shift work required. Great communication skills needed.", skills: ["Communication", "Problem Solving", "Customer Service"], salaryMin: 250, salaryMax: 350, applyEmail: "support@telecom.co.zw", locationName: "Bulawayo", isActive: true, createdBy: 'demo' },
+  { id: 'j4', title: "Marketing Intern", company: "Creative Agency", category: "Marketing", type: "Internship", description: "Assist in social media management and campaign execution. Perfect for a recent graduate.", skills: ["Social Media", "Marketing", "Creativity"], salaryMin: 150, salaryMax: 200, applyUrl: "https://example.com/apply", locationName: "Harare", isActive: true, createdBy: 'demo' }
+];
+
+const MOCK_PORTFOLIO = {
+  userId: 'demo',
+  displayName: 'Tinashe',
+  headline: 'Junior Developer & Tech Enthusiast',
+  bio: 'Passionate about building web apps and solving local problems using technology. Fast learner with a strong foundation in JavaScript.',
+  experienceYears: 2,
+  skills: ['JavaScript', 'React', 'Customer Service', 'Communication', 'HTML', 'CSS'],
+  preferredJobTypes: ['Remote', 'Part-time', 'Full-time'],
+  preferredCategories: ['Technology', 'Customer Service', 'Marketing']
+};
+
+// ==================== UTILITIES ====================
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function distTo(l) { return (!userLocation || !l.lat || !l.lng) ? null : getDistance(userLocation.lat, userLocation.lng, l.lat, l.lng); }
+function escapeHtml(s) { return s == null ? '' : String(s).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m])); }
+function formatDate(d) {
+  if (!d) return 'Recently';
+  const dt = d.toDate ? d.toDate() : new Date(d);
+  const diff = (Date.now() - dt) / 1000;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function isExpired(l) {
+  const t = l.createdAt?.toMillis?.() ?? null;
+  if (!t) return false;
+  return Date.now() - t > 90 * 86400000;
+}
+function showToast(msg, type = 'info', dur = 3000) {
+  const c = document.getElementById('toastContainer');
+  c.classList.add('visible');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', info: 'fa-info-circle' };
+  t.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i> <span>${escapeHtml(msg)}</span>`;
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.opacity = '0'; t.style.transform = 'translateY(-10px)';
+    setTimeout(() => { t.remove(); if (!c.children.length) c.classList.remove('visible'); }, 300);
+  }, dur);
+}
+function updateFavBadge() {
+  const b = document.getElementById('favBadge');
+  if (favorites.length) { b.innerText = favorites.length; b.style.display = 'flex'; }
+  else b.style.display = 'none';
+}
+function lockBody(l) { document.body.classList.toggle('modal-open', l); }
+function anyModalOpen() { return !!document.querySelector('.modal-overlay.active'); }
+function checkRateLimit(key, max = 5) {
+  const now = Date.now();
+  const arr = (rateLimit[key] || []).filter(t => now - t < 60000);
+  if (arr.length >= max) return false;
+  arr.push(now); rateLimit[key] = arr;
+  sessionStorage.setItem('rate_market_v2', JSON.stringify(rateLimit));
+  return true;
+}
+
+// ==================== MAP ====================
+function getMapOverlay() {
+  const el = document.getElementById('map');
+  if (!el) return { top: 0, bottom: 0 };
+  const rect = el.getBoundingClientRect();
+  const header = document.querySelector('.glass-header');
+  const top = header ? Math.max(0, header.getBoundingClientRect().bottom - rect.top + 8) : 0;
+  let bottom = 0;
+  if (activeMode === 'discover') {
+    const deck = document.getElementById('cardDeck');
+    if (deck && !deck.classList.contains('hidden')) {
+      bottom = Math.max(0, rect.bottom - deck.getBoundingClientRect().top + 8);
+    }
+  } else {
+    const sheet = document.getElementById('bottomSheet');
+    if (sheet && sheet.classList.contains('visible')) {
+      bottom = Math.max(0, rect.bottom - sheet.getBoundingClientRect().top + 8);
+    }
+  }
+  return { top, bottom };
+}
+
+function centerMap(lat, lng, zoom = 15, animate = false) {
+  if (!map) return;
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
+  try {
+    const size = map.getSize();
+    if (size.x < 50 || size.y < 50) {
+      setTimeout(() => centerMap(lat, lng, zoom, animate), 200);
+      return;
+    }
+    map.invalidateSize();
+    map.setView([lat, lng], zoom, { animate: false });
+    const { top, bottom } = getMapOverlay();
+    const move = (top - bottom) / 2;
+    if (Math.abs(move) > 2) {
+      map.panBy([0, -move], { animate });
+    }
+  } catch (e) {
+    console.error('[MAP] centerMap failed:', e);
+    try { map.setView([lat, lng], zoom); } catch (_) {}
+  }
+}
+
+function placeUserMarker() {
+  if (!map || !userLocation) return;
+  if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+  const icon = L.divIcon({
+    className: 'user-location-pulse',
+    html: '<div style="background:#3b82f6;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px rgba(37,99,235,.6);"></div>',
+    iconSize: [22, 22], iconAnchor: [11, 11]
+  });
+  userMarker = L.marker([userLocation.lat, userLocation.lng], { icon })
+    .addTo(map)
+    .bindPopup('<b>You are here</b>');
+}
+
+function initMap() {
+  const el = document.getElementById('map');
+  if (!el) { setTimeout(initMap, 100); return; }
+  if (!window.L) { setTimeout(initMap, 150); return; }
+
+  try {
+    map = L.map('map', { zoomControl: false, attributionControl: true })
+      .setView([-17.825, 31.033], 13);
+
+    L.control.zoom({ position: 'topright' }).addTo(map);
+
+    const osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      crossOrigin: true
+    }).addTo(map);
+
+    let tileLoadCount = 0;
+    osmLayer.on('tileload', () => {
+      tileLoadCount++;
+      if (tileLoadCount === 1) {
+        const loader = document.getElementById('mapLoading');
+        if (loader) { loader.classList.add('hidden'); setTimeout(() => loader.remove(), 500); }
+      }
+    });
+
+    [0, 100, 300, 800, 1500, 3000].forEach(ms =>
+      setTimeout(() => { if (map) map.invalidateSize(); }, ms));
+
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => { if (map) map.invalidateSize(); }).observe(el);
+    }
+    window.addEventListener('resize', () => map && map.invalidateSize());
+    window.addEventListener('orientationchange', () => setTimeout(() => map && map.invalidateSize(), 300));
+
+    listingsLayer = L.layerGroup().addTo(map);
+
+    userLocation = { lat: -17.825, lng: 31.033 };
+    placeUserMarker();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          placeUserMarker();
+          centerMap(userLocation.lat, userLocation.lng, 15);
+          renderListings();
+        },
+        err => {
+          showToast('Using Harare CBD — ' + err.message, 'info', 4000);
+          centerMap(userLocation.lat, userLocation.lng, 13);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    } else {
+      centerMap(userLocation.lat, userLocation.lng, 13);
+    }
+
+    document.getElementById('recenterBtn').addEventListener('click', () => {
+      if (!userLocation) return;
+      map.invalidateSize();
+      centerMap(userLocation.lat, userLocation.lng, 15, true);
+      showToast('Centered on you', 'success', 1200);
+    });
+
+  } catch (e) {
+    console.error('[MAP] FATAL:', e);
+    showToast('Map error: ' + e.message, 'error', 8000);
+    const loader = document.getElementById('mapLoading');
+    if (loader) loader.innerHTML = '<div style="color:#ef4444;">Map failed to load</div>';
+  }
+}
+
+function renderMapMarkers() {
+  if (!map || !listingsLayer) return;
+  listingsLayer.clearLayers();
+  allListings.forEach(l => {
+    if (!l.lat || !l.lng || isExpired(l)) return;
+    const marker = L.circleMarker([l.lat, l.lng], {
+      radius: 8, fillColor: '#3b82f6', color: '#fff', weight: 3, fillOpacity: 0.9
+    });
+    marker.bindPopup(`
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;min-width:150px;">
+        <div style="font-weight:800;font-size:.9rem;margin-bottom:4px;color:#1e40af;">${escapeHtml(l.title)}</div>
+        <div style="font-size:.78rem;color:#64748b;">${escapeHtml(l.category) || 'General'}</div>
+      </div>`, { closeButton: false, offset: [0, -5] });
+    marker.on('click', () => {
+      openDetailModal(l.id);
+      try {
+        const p = map.latLngToContainerPoint([l.lat, l.lng]);
+        const { top, bottom } = getMapOverlay();
+        const mapH = map.getSize().y;
+        const visible = p.y > top && p.y < (mapH - bottom);
+        if (!visible) centerMap(l.lat, l.lng, Math.max(map.getZoom(), 15), true);
+      } catch (_) {}
+    });
+    marker.addTo(listingsLayer);
+  });
+}
+
+// ==================== MODE SWITCHING ====================
+function switchMode(mode) {
+  activeMode = mode;
+  document.body.dataset.mode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+
+  const deck = document.getElementById('cardDeck');
+  const sheet = document.getElementById('bottomSheet');
+  const search = document.getElementById('globalSearch');
+  const fab = document.getElementById('fabAdd');
+
+  if (mode === 'discover') {
+    deck.classList.remove('hidden');
+    sheet.classList.remove('visible');
+    search.placeholder = 'Search nearby listings...';
+    fab.classList.remove('jobs');
+    fab.title = 'Add listing';
+    renderCardDeck();
+  } else {
+    deck.classList.add('hidden');
+    sheet.classList.add('visible');
+    search.placeholder = 'Search jobs by title, skills, company...';
+    fab.classList.add('jobs');
+    fab.title = 'Post a job';
+    if (mode === 'jobs') { loadJobs().then(renderJobsSheet); }
+    else { loadPortfolio().then(renderMatchSheet); }
+  }
+
+  setTimeout(() => {
+    if (!map) return;
+    map.invalidateSize();
+    if (userLocation) centerMap(userLocation.lat, userLocation.lng, map.getZoom(), false);
+  }, 380);
+}
+
+function renderActiveMode() {
+  if (activeMode === 'discover') renderCardDeck();
+  else if (activeMode === 'jobs') renderJobsSheet();
+  else renderMatchSheet();
+}
+
+// ==================== CARD DECK ====================
+function getFilteredListings() {
+  let f = allListings.map(l => ({ ...l, distance: distTo(l) }));
+  if (filters.category) f = f.filter(l => l.category === filters.category);
+  if (filters.openNow) f = f.filter(l => l.isOpen === true);
+  f = f.filter(l => l.distance === null || l.distance <= filters.maxDist);
+  if (searchTerm.trim()) {
+    const t = searchTerm.toLowerCase();
+    f = f.filter(l => (l.title||'').toLowerCase().includes(t) || (l.category||'').toLowerCase().includes(t) || (l.description||'').toLowerCase().includes(t));
+  }
+  if (sortBy === 'distance') f.sort((a, b) => ((a.distance === null) - (b.distance === null)) || ((a.distance || 0) - (b.distance || 0)));
+  else if (sortBy === 'rating') f.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  else f.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  return f;
+}
+
+function renderCardDeck() {
+  deckListings = getFilteredListings();
+  const track = document.getElementById('deckTrack');
+  const counter = document.getElementById('deckCounter');
+
+  if (!deckListings.length) {
+    track.innerHTML = `<div class="deck-empty"><i class="fas fa-search"></i><p>No listings found</p><small style="font-size:.72rem;">Try adjusting filters or add your own</small></div>`;
+    counter.textContent = '0 of 0';
+    return;
+  }
+
+  track.innerHTML = deckListings.map((l, i) => {
+    const isFav = favorites.includes(l.id);
+    const dist = l.distance !== null ? `${l.distance.toFixed(1)} km` : 'Location n/a';
+    const img = l.imageUrl
+      ? `<img src="${escapeHtml(l.imageUrl)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"><div class="ph" style="display:none;"><i class="fas fa-store"></i></div>`
+      : `<div class="ph"><i class="fas fa-store"></i></div>`;
+    return `
+      <div class="deck-card ${i === 0 ? 'active' : ''}" data-id="${l.id}" data-index="${i}">
+        <div class="deck-card-image">
+          ${img}
+          <span class="deck-card-cat-badge">${escapeHtml(l.category || 'General')}</span>
+        </div>
+        <div class="deck-card-body">
+          <div class="deck-card-title">${escapeHtml(l.title)}</div>
+          <div class="deck-card-desc">${escapeHtml(l.description || '')}</div>
+          <div class="deck-card-footer">
+            <span class="deck-card-dist ${l.distance === null ? 'unknown' : ''}"><i class="fas fa-location-dot"></i> ${dist}</span>
+            <div class="deck-card-actions">
+              <button class="fav ${isFav ? 'favorited' : ''}" data-id="${l.id}" aria-label="Favorite"><i class="fas fa-heart"></i></button>
+              <button class="view" data-id="${l.id}" aria-label="View"><i class="fas fa-arrow-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  counter.textContent = `1 of ${deckListings.length}`;
+  activeDeckIndex = 0;
+
+  track.querySelectorAll('.deck-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.closest('.fav')) return;
+      openDetailModal(card.dataset.id);
+    });
+  });
+  track.querySelectorAll('.fav').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); toggleFavorite(btn.dataset.id); });
+  });
+  track.querySelectorAll('.view').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openDetailModal(btn.dataset.id); });
+  });
+
+  setupDeckScrollSync();
+
+  if (deckListings[0]?.lat && deckListings[0]?.lng) {
+    setTimeout(() => centerMap(deckListings[0].lat, deckListings[0].lng, 15, false), 250);
+  }
+}
+
+function setupDeckScrollSync() {
+  const track = document.getElementById('deckTrack');
+  let timer;
+  track.onscroll = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const cards = track.querySelectorAll('.deck-card');
+      if (!cards.length) return;
+      const trackRect = track.getBoundingClientRect();
+      const trackCenter = trackRect.left + trackRect.width / 2;
+      let closest = null, minDist = Infinity;
+      cards.forEach(card => {
+        const r = card.getBoundingClientRect();
+        const c = r.left + r.width / 2;
+        const d = Math.abs(c - trackCenter);
+        if (d < minDist) { minDist = d; closest = card; }
+      });
+      if (!closest) return;
+      cards.forEach(c => c.classList.toggle('active', c === closest));
+      const idx = parseInt(closest.dataset.index);
+      if (idx === activeDeckIndex) return;
+      activeDeckIndex = idx;
+      document.getElementById('deckCounter').textContent = `${idx + 1} of ${deckListings.length}`;
+      const l = deckListings[idx];
+      if (l?.lat && l?.lng) centerMap(l.lat, l.lng, Math.max(map.getZoom(), 15), true);
+    }, 120);
+  };
+}
+
+function toggleFavorite(id) {
+  const i = favorites.indexOf(id);
+  const adding = i < 0;
+  if (adding) favorites.push(id); else favorites.splice(i, 1);
+  localStorage.setItem('favs_market_v2', JSON.stringify(favorites));
+  updateFavBadge();
+  document.querySelectorAll(`.fav[data-id="${id}"]`).forEach(b => b.classList.toggle('favorited', adding));
+  showToast(adding ? 'Added to favorites' : 'Removed', adding ? 'success' : 'info', 1500);
+}
+
+// ==================== JOBS / MATCH SHEET ====================
+function renderJobsSheet() {
+  document.getElementById('sheetTitle').textContent = 'Job openings';
+  document.getElementById('sheetCount').textContent = jobs.length;
+  const c = document.getElementById('sheetContent');
+
+  if (!jobs.length) {
+    c.innerHTML = `<div class="jobs-empty"><i class="fas fa-briefcase"></i><h3>No jobs yet</h3><p>Be the first to post one — it's free.</p><button class="btn-primary" style="max-width:220px;margin:0 auto;" onclick="openPostJobModal()"><i class="fas fa-plus"></i> Post a job</button></div>`;
+    return;
+  }
+
+  let filtered = jobs;
+  if (jobSearchTerm.trim()) {
+    const t = jobSearchTerm.toLowerCase();
+    filtered = filtered.filter(j => (j.title||'').toLowerCase().includes(t) || (j.company||'').toLowerCase().includes(t) || (j.category||'').toLowerCase().includes(t) || (j.skills||[]).some(s => String(s).toLowerCase().includes(t)));
+  }
+  document.getElementById('sheetCount').textContent = filtered.length;
+
+  c.innerHTML = filtered.map(j => renderJobCard(j)).join('');
+}
+
+function renderMatchSheet() {
+  document.getElementById('sheetTitle').textContent = '✨ For you';
+  const c = document.getElementById('sheetContent');
+
+  if (!currentUser && !userPortfolio) {
+    c.innerHTML = `<div style="text-align:center;padding:40px 20px;"><i class="fas fa-user-circle" style="font-size:3rem;color:var(--gray-300);margin-bottom:12px;display:block;"></i><h3 style="font-size:1rem;color:var(--gray-600);font-weight:700;margin-bottom:6px;">Log in to see matches</h3><p style="font-size:.82rem;color:var(--gray-400);margin-bottom:16px;">We'll match you to jobs based on your portfolio</p><button class="btn-primary" style="max-width:220px;margin:0 auto;" onclick="updateProfileModal();openModalWithFocus('profileModal')">Log in</button></div>`;
+    document.getElementById('sheetCount').textContent = '0';
+    return;
+  }
+
+  if (!userPortfolio) {
+    c.innerHTML = `<div style="background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:var(--r-md);padding:24px;text-align:center;margin-bottom:16px;">
+      <i class="fas fa-magic" style="font-size:2.5rem;color:var(--accent-dark);margin-bottom:12px;display:block;"></i>
+      <h3 style="font-size:1.05rem;font-weight:800;color:#92400e;margin-bottom:6px;">Create your portfolio</h3>
+      <p style="font-size:.82rem;color:#78350f;margin-bottom:14px;line-height:1.5;">Tell us your skills — we'll match you to the perfect jobs</p>
+      <button class="btn-primary" onclick="openPortfolioEditor()"><i class="fas fa-id-card"></i> Create portfolio</button>
+    </div>`;
+    document.getElementById('sheetCount').textContent = '0';
+    return;
+  }
+
+  const scored = jobs.map(j => ({ job: j, score: calculateMatchScore(j, userPortfolio) })).filter(x => x.score >= 25).sort((a, b) => b.score - a.score);
+  document.getElementById('sheetCount').textContent = scored.length;
+
+  let html = '';
+  if (scored.length) {
+    const top = scored[0];
+    html += `
+      <div class="match-radar" style="--match-pct:${top.score}%;">
+        <div class="match-radar-ring"><span class="match-radar-pct">${top.score}%</span></div>
+        <div class="match-radar-body">
+          <div class="match-radar-label">Top match for you</div>
+          <div class="match-radar-title">${escapeHtml(top.job.title)}</div>
+          <div class="match-radar-sub">${escapeHtml(top.job.company)}</div>
+        </div>
+      </div>`;
+  }
+
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div style="font-size:.85rem;font-weight:800;color:var(--dark);">${scored.length} matched jobs</div>
+    <button class="btn-secondary" style="width:auto;padding:6px 14px;font-size:.75rem;" onclick="openPortfolioEditor()">Edit portfolio</button>
+  </div>`;
+
+  if (!scored.length) {
+    html += `<div class="jobs-empty"><i class="fas fa-magic"></i><h3>No matches yet</h3><p>We'll show jobs matching your skills as they're posted.</p></div>`;
+  } else {
+    html += scored.map(({ job, score }) => renderJobCard(job, score)).join('');
+  }
+
+  c.innerHTML = html;
+}
+
+function renderJobCard(job, score = null) {
+  const applied = appliedJobs.has(job.id);
+  const sal = job.salaryMin && job.salaryMax ? `$${job.salaryMin}-${job.salaryMax}` : (job.salaryMin ? `From $${job.salaryMin}` : '');
+  const badge = score !== null ? (() => { const m = getMatchLabel(score); return `<span class="match-badge ${m.cls}"><i class="fas fa-magic"></i> ${score}%</span>`; })() : '';
+  return `<div class="job-card ${score !== null && score >= 60 ? 'matched' : ''}" data-job-id="${job.id}" onclick="openJobDetail('${job.id}')">
+    <div class="job-header"><div style="flex:1;min-width:0;"><div class="job-title">${escapeHtml(job.title)}</div><div class="job-company"><i class="fas fa-building"></i>${escapeHtml(job.company || 'Company')}</div></div></div>
+    ${badge}
+    <div class="job-meta">
+      <span class="job-type-pill">${escapeHtml(job.type || 'Full-time')}</span>
+      <span class="job-type-pill">${escapeHtml(job.category || 'General')}</span>
+      ${sal ? `<span class="salary-badge"><i class="fas fa-money-bill"></i> ${sal}</span>` : ''}
+    </div>
+    <div class="job-desc">${escapeHtml(job.description || '')}</div>
+    <div class="job-footer">
+      <span class="job-location"><i class="fas fa-location-dot"></i> ${escapeHtml(job.locationName || 'See details')}</span>
+      <button class="apply-btn ${applied ? 'applied' : ''}" onclick="event.stopPropagation();${applied ? '' : `openJobDetail('${job.id}')`}">${applied ? '<i class="fas fa-check"></i> Applied' : '<i class="fas fa-arrow-right"></i> View'}</button>
+    </div>
+  </div>`;
+}
+
+function getMatchLabel(s) {
+  if (s >= 80) return { label: 'Excellent', cls: 'excellent' };
+  if (s >= 60) return { label: 'Good', cls: 'good' };
+  if (s >= 40) return { label: 'Fair', cls: 'fair' };
+  return { label: 'Low', cls: 'low' };
+}
+
+function calculateMatchScore(job, pf) {
+  if (!pf) return 0;
+  let s = 0;
+  const js = (job.skills || []).map(x => String(x).toLowerCase().trim()).filter(Boolean);
+  const us = (pf.skills || []).map(x => String(x).toLowerCase().trim()).filter(Boolean);
+  if (js.length && us.length) {
+    let m = 0;
+    js.forEach(x => { if (us.some(u => u.includes(x) || x.includes(u))) m++; });
+    s += (m / js.length) * 50;
+  } else s += 25;
+  const jt = (job.type || '').toLowerCase();
+  if (jt === 'remote') s += 20;
+  else if (pf.lat && pf.lng && job.lat && job.lng) {
+    const d = getDistance(pf.lat, pf.lng, job.lat, job.lng);
+    s += d < 5 ? 20 : d < 20 ? 16 : d < 50 ? 12 : d < 100 ? 6 : 2;
+  } else s += 10;
+  const pt = (pf.preferredJobTypes || []).map(t => t.toLowerCase());
+  s += !pt.length ? 8 : pt.includes(jt) ? 15 : 3;
+  const text = ((job.title || '') + ' ' + (job.description || '')).toLowerCase();
+  const yrs = Number(pf.experienceYears) || 0;
+  let lvl = 'mid';
+  if (/intern|junior|entry|graduate|trainee/.test(text)) lvl = 'entry';
+  else if (/senior|lead|manager|director|principal/.test(text)) lvl = 'senior';
+  s += lvl === 'entry' && yrs <= 2 ? 15 : lvl === 'mid' && yrs >= 2 && yrs <= 8 ? 15 : lvl === 'senior' && yrs >= 5 ? 15 : 6;
+  if ((pf.preferredCategories || []).map(c => c.toLowerCase()).includes((job.category || '').toLowerCase())) s = Math.min(100, s + 8);
+  return Math.round(Math.max(0, Math.min(100, s)));
+}
+
+// ==================== LOADING ====================
+async function loadListings(reset = false) {
+  if (reset) { allListings = []; lastVisibleDoc = null; hasMore = true; }
+  if (!hasMore && !reset) return;
+  try {
+    let q = db.collection('listings').orderBy('createdAt', 'desc').limit(PAGE_SIZE);
+    if (lastVisibleDoc && !reset) q = q.startAfter(lastVisibleDoc);
+    const snap = await q.get();
+    const items = snap.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data,
+        lat: typeof data.lat === 'number' ? data.lat : null,
+        lng: typeof data.lng === 'number' ? data.lng : null,
+        isOpen: data.isOpen === true,
+        rating: data.rating || 0, reviewCount: data.reviewCount || 0 };
+    });
+    
+    // MOCK DATA FALLBACK FOR PRESENTATION
+    if (items.length === 0) {
+      console.log('Using mock data for presentation');
+      allListings = MOCK_LISTINGS;
+    } else {
+      allListings = items;
+    }
+    
+    renderMapMarkers();
+    if (activeMode === 'discover') renderCardDeck();
+    tryHandleDeepLink();
+  } catch (e) {
+    console.error('[FIRESTORE] Load failed:', e.code, e.message);
+    // Fallback to mock data if offline or firebase fails
+    allListings = MOCK_LISTINGS;
+    renderMapMarkers();
+    if (activeMode === 'discover') renderCardDeck();
+  }
+}
+
+async function loadJobs() {
+  if (jobsLoaded) return;
+  jobsLoaded = true;
+  try {
+    const snap = await db.collection('jobs').where('isActive', '==', true).orderBy('createdAt', 'desc').limit(50).get();
+    const items = snap.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data, skills: Array.isArray(data.skills) ? data.skills : [],
+        lat: typeof data.lat === 'number' ? data.lat : null,
+        lng: typeof data.lng === 'number' ? data.lng : null };
+    });
+    
+    if (items.length === 0) {
+      jobs = MOCK_JOBS;
+    } else {
+      jobs = items;
+    }
+  } catch (e) {
+    console.error('[FIRESTORE] Jobs failed:', e.code, e.message);
+    jobs = MOCK_JOBS;
+  }
+}
+
+async function loadPortfolio() {
+  if (!currentUser && !userPortfolio) { 
+    // FOR PRESENTATION: Auto-inject a portfolio if not logged in
+    userPortfolio = MOCK_PORTFOLIO;
+    portfolioSkills = MOCK_PORTFOLIO.skills;
+    return; 
+  }
+  try {
+    const s = await db.collection('portfolios').doc(currentUser.uid).get();
+    userPortfolio = s.exists ? s.data() : MOCK_PORTFOLIO; // Fallback to mock
+    portfolioSkills = userPortfolio?.skills || [];
+  } catch (e) { 
+    userPortfolio = MOCK_PORTFOLIO; 
+    portfolioSkills = MOCK_PORTFOLIO.skills;
+  }
+  try {
+    const s = await db.collection('applications').where('userId', '==', currentUser.uid).limit(200).get();
+    appliedJobs = new Set(s.docs.map(d => d.data().jobId));
+  } catch (e) {}
+}
+
+// ==================== DETAIL MODAL ====================
+async function openDetailModal(id) {
+  const l = allListings.find(x => x.id === id);
+  if (!l) return;
+  const url = new URL(location.href); url.searchParams.set('listing', id); history.replaceState({}, '', url);
+  document.getElementById('detailTitle').innerHTML = escapeHtml(l.title);
+  document.getElementById('detailBody').innerHTML = '<div class="detail-loading"><div class="spinner"></div></div>';
+  document.getElementById('detailsModal').classList.add('active');
+  lockBody(true);
+
+  const dist = distTo(l);
+  const isOwner = currentUser && l.createdBy === currentUser.uid;
+
+  const img = l.imageUrl
+    ? `<img class="detail-hero" src="${escapeHtml(l.imageUrl)}" onerror="this.style.display='none'">`
+    : `<div class="detail-hero-placeholder"><i class="fas fa-store"></i></div>`;
+
+  let meta = '<div class="detail-meta-grid">';
+  meta += `<div class="detail-meta-item"><strong>Category</strong><i class="fas fa-tag"></i>${escapeHtml(l.category)}</div>`;
+  meta += `<div class="detail-meta-item"><strong>Distance</strong><i class="fas fa-ruler-combined"></i>${dist !== null ? dist.toFixed(1) + ' km' : 'Unknown'}</div>`;
+  if (l.phone) meta += `<div class="detail-meta-item"><strong>Phone</strong><i class="fas fa-phone"></i>${escapeHtml(l.phone)}</div>`;
+  if (l.hours) meta += `<div class="detail-meta-item"><strong>Hours</strong><i class="fas fa-clock"></i>${escapeHtml(l.hours)}</div>`;
+  meta += '</div>';
+
+  let actions = '';
+  if (l.phone) {
+    const wa = l.phone.replace(/\D/g, '').replace(/^0/, '263');
+    actions = `<div class="action-grid">
+      <button class="action-btn call" onclick="contactListingById('${l.id}')"><i class="fas fa-phone-alt"></i> Call</button>
+      <a href="https://wa.me/${wa}" target="_blank" class="action-btn whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+      <button class="action-btn directions" onclick="getDirections(${l.lat || 0}, ${l.lng || 0})"><i class="fas fa-directions"></i> Directions</button>
+      <button class="action-btn share" onclick="shareListing('${l.id}')"><i class="fas fa-share-alt"></i> Share</button>
+    </div>`;
+  } else {
+    actions = `<div class="action-grid">
+      <button class="action-btn directions" onclick="getDirections(${l.lat || 0}, ${l.lng || 0})"><i class="fas fa-directions"></i> Directions</button>
+      <button class="action-btn share" onclick="shareListing('${l.id}')"><i class="fas fa-share-alt"></i> Share</button>
+    </div>`;
+  }
+
+  let reviews = reviewsCache[id];
+  if (!reviews) {
+    try {
+      const s = await db.collection('listings').doc(id).collection('reviews').orderBy('createdAt', 'desc').limit(5).get();
+      reviews = s.docs.map(d => ({ id: d.id, ...d.data() }));
+      reviewsCache[id] = reviews;
+    } catch (e) { reviews = []; }
+  }
+
+  let revHtml = '<div class="detail-section-title"><i class="fas fa-comments"></i> Reviews</div>';
+  if (!reviews.length) revHtml += '<p style="font-size:.85rem;color:var(--gray-400);padding:8px 0;">No reviews yet.</p>';
+  else reviews.forEach(r => {
+    const st = '★'.repeat(r.rating || 0) + '☆'.repeat(5 - (r.rating || 0));
+    revHtml += `<div class="review-card"><div class="review-header"><span class="reviewer-name">${escapeHtml(r.reviewerName || 'Anonymous')}</span><span class="review-date">${formatDate(r.createdAt)}</span></div><div class="review-stars">${st}</div><div class="review-text">${escapeHtml(r.text || '')}</div></div>`;
+  });
+
+  const form = currentUser ? `<div class="review-form"><label style="font-size:.8rem;">Write a review</label><div class="star-rating-input" id="reviewStarInput"><i class="fas fa-star" data-v="1"></i><i class="fas fa-star" data-v="2"></i><i class="fas fa-star" data-v="3"></i><i class="fas fa-star" data-v="4"></i><i class="fas fa-star" data-v="5"></i></div><textarea id="reviewText" rows="2" placeholder="Your experience..." style="border-radius:16px;min-height:60px;"></textarea><button class="btn-primary" style="margin-top:10px;padding:10px;" onclick="submitReview('${id}')">Submit</button></div>` : '<p style="font-size:.82rem;color:var(--gray-500);margin:8px 0;">Log in to review.</p>';
+
+  const owner = isOwner ? `<div style="display:flex;gap:8px;margin-top:12px;">
+    <button class="btn-secondary" style="flex:1;padding:10px;font-size:.8rem;" onclick="document.getElementById('detailsModal').classList.remove('active');startEditListing('${l.id}')"><i class="fas fa-edit"></i> Edit</button>
+    <button class="btn-secondary" style="flex:1;padding:10px;font-size:.8rem;color:var(--danger);" onclick="deleteListing('${l.id}')"><i class="fas fa-trash"></i> Delete</button>
+  </div>` : '';
+
+  document.getElementById('detailBody').innerHTML = `
+    ${img}
+    <div class="detail-title">${escapeHtml(l.title)}</div>
+    <div class="detail-rating"><span class="stars">${'★'.repeat(Math.round(l.rating))}${'☆'.repeat(5-Math.round(l.rating))}</span><span class="score">${l.rating ? l.rating.toFixed(1) : 'N/A'}</span><span class="count">(${l.reviewCount || 0})</span></div>
+    ${meta}
+    <div class="detail-description">${escapeHtml(l.description || '')}</div>
+    ${actions}
+    ${owner}
+    <button class="report-btn" onclick="reportListing('${l.id}')"><i class="fas fa-flag"></i> Report</button>
+    ${revHtml}
+    ${form}`;
+
+  let sel = 0;
+  document.querySelectorAll('#reviewStarInput i').forEach(s => s.addEventListener('click', () => {
+    sel = parseInt(s.dataset.v);
+    document.querySelectorAll('#reviewStarInput i').forEach((x, i) => x.classList.toggle('active', i < sel));
+  }));
+  window._selReview = () => sel;
+}
+
+async function submitReview(id) {
+  if (!checkRateLimit('reviews', 3)) { showToast('Too many reviews', 'error'); return; }
+  const rating = window._selReview?.() || 0;
+  const text = document.getElementById('reviewText')?.value.trim();
+  if (!rating || !text) { showToast('Rating and text required', 'error'); return; }
+  try {
+    await db.collection('listings').doc(id).collection('reviews').add({
+      rating, text,
+      reviewerName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Anon',
+      reviewerId: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    const all = await db.collection('listings').doc(id).collection('reviews').get();
+    const avg = all.size ? all.docs.reduce((s, d) => s + (d.data().rating || 0), 0) / all.size : 0;
+    await db.collection('listings').doc(id).update({ rating: Math.round(avg * 10) / 10, reviewCount: all.size });
+    reviewsCache[id] = null;
+    showToast('Review submitted', 'success');
+    openDetailModal(id);
+  } catch (e) { showToast('Failed', 'error'); }
+}
+
+function contactListingById(id) {
+  const l = allListings.find(x => x.id === id);
+  if (l?.phone) window.location.href = `tel:${l.phone}`;
+  else showToast('No phone', 'error');
+}
+function getDirections(lat, lng) {
+  if (!lat || !lng) { showToast('No location', 'error'); return; }
+  const o = userLocation ? `${userLocation.lat},${userLocation.lng}` : '';
+  window.open(`https://www.google.com/maps/dir/?api=1&${o?'origin='+o+'&':''}destination=${lat},${lng}&travelmode=driving`, '_blank');
+}
+async function shareListing(id) {
+  const l = allListings.find(x => x.id === id);
+  if (!l) return;
+  const url = `${location.origin}${location.pathname}?listing=${id}`;
+  if (navigator.share) { try { await navigator.share({ title: l.title, text: l.title, url }); return; } catch (e) {} }
+  try { await navigator.clipboard.writeText(url); showToast('Link copied', 'success'); } catch (e) {}
+}
+function reportListing(id) {
+  if (!confirm('Report this listing?')) return;
+  db.collection('reports').add({ listingId: id, reportedBy: currentUser?.uid || 'anon', createdAt: firebase.firestore.FieldValue.serverTimestamp() })
+    .then(() => showToast('Reported', 'success')).catch(() => {});
+}
+
+// ==================== EDIT / DELETE LISTING ====================
+function startEditListing(id) {
+  const l = allListings.find(x => x.id === id);
+  if (!l || l.createdBy !== currentUser?.uid) return;
+  editingListingId = id;
+  document.getElementById('addModalTitle').innerHTML = '<i class="fas fa-edit"></i> Edit listing';
+  document.getElementById('publishBtn').innerHTML = '<i class="fas fa-save"></i> Save';
+  document.getElementById('listingTitle').value = l.title || '';
+  document.getElementById('listingCat').value = l.category || '';
+  document.getElementById('listingDesc').value = l.description || '';
+  document.getElementById('listingImage').value = l.imageUrl || '';
+  document.getElementById('listingPhone').value = l.phone || '';
+  document.getElementById('listingEmail').value = l.email || '';
+  document.getElementById('listingWeb').value = l.website || '';
+  document.getElementById('listingHours').value = l.hours || '';
+  document.getElementById('listingIsOpen').checked = l.isOpen === true;
+  document.getElementById('listingLat').value = l.lat || '';
+  document.getElementById('listingLng').value = l.lng || '';
+  document.getElementById('locationPreview').innerHTML = l.lat ? `<i class="fas fa-check-circle" style="color:var(--success);"></i> ${l.lat.toFixed(4)}, ${l.lng.toFixed(4)}` : 'Using current location';
+  pendingImageFile = null;
+  const thumb = document.getElementById('imagePreviewThumb');
+  if (l.imageUrl) { thumb.src = l.imageUrl; thumb.style.display = 'block'; } else thumb.style.display = 'none';
+  openModalWithFocus('addListingModal');
+}
+
+function resetAddForm() {
+  editingListingId = null; pendingImageFile = null;
+  document.getElementById('addModalTitle').innerHTML = '<i class="fas fa-plus-circle"></i> New listing';
+  document.getElementById('publishBtn').innerHTML = '<i class="fas fa-paper-plane"></i> Publish';
+  document.querySelectorAll('#addListingModal input:not([type=checkbox]), #addListingModal textarea').forEach(el => el.value = '');
+  document.querySelectorAll('#addListingModal input[type=checkbox]').forEach(el => el.checked = false);
+  document.getElementById('listingCat').value = '';
+  document.getElementById('imagePreviewThumb').style.display = 'none';
+  document.getElementById('locationPreview').innerHTML = 'Using current location';
+}
+
+async function deleteListing(id) {
+  const l = allListings.find(x => x.id === id);
+  if (!l || l.createdBy !== currentUser?.uid) return;
+  if (!confirm(`Delete "${l.title}"?`)) return;
+  try {
+    await db.collection('listings').doc(id).delete();
+    allListings = allListings.filter(x => x.id !== id);
+    closeAllModals();
+    renderMapMarkers();
+    if (activeMode === 'discover') renderCardDeck();
+    showToast('Deleted', 'success');
+  } catch (e) { showToast('Failed', 'error'); }
+}
+
+async function uploadImageIfAny() {
+  if (!pendingImageFile || !currentUser) return null;
+  const ext = pendingImageFile.name.split('.').pop();
+  const ref = storage.ref(`listings/${currentUser.uid}/${Date.now()}.${ext}`);
+  const pr = document.getElementById('uploadProgress');
+  const bar = document.getElementById('uploadProgressBar');
+  pr.classList.add('visible');
+  return new Promise((res, rej) => {
+    const task = ref.put(pendingImageFile);
+    task.on('state_changed', s => { bar.style.width = (s.bytesTransferred / s.totalBytes * 100) + '%'; },
+      rej,
+      async () => { const u = await task.snapshot.ref.getDownloadURL(); pr.classList.remove('visible'); bar.style.width = '0%'; res(u); });
+  });
+}
+
+async function publishListing() {
+  if (!currentUser) { showToast('Log in first', 'error'); closeAllModals(); updateProfileModal(); openModalWithFocus('profileModal'); return; }
+  if (!checkRateLimit('publish', 3)) { showToast('Too many attempts', 'error'); return; }
+  const title = document.getElementById('listingTitle').value.trim();
+  const cat = document.getElementById('listingCat').value;
+  const desc = document.getElementById('listingDesc').value.trim();
+  if (!title || !cat || !desc) { showToast('Fill required fields', 'error'); return; }
+  let lat = parseFloat(document.getElementById('listingLat').value);
+  let lng = parseFloat(document.getElementById('listingLng').value);
+  if (isNaN(lat) || isNaN(lng)) { lat = userLocation?.lat || null; lng = userLocation?.lng || null; }
+  const btn = document.getElementById('publishBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+  try {
+    let imageUrl = document.getElementById('listingImage').value.trim();
+    if (pendingImageFile) imageUrl = await uploadImageIfAny();
+    const data = {
+      title, category: cat, description: desc,
+      phone: document.getElementById('listingPhone').value.trim(),
+      email: document.getElementById('listingEmail').value.trim(),
+      website: document.getElementById('listingWeb').value.trim(),
+      imageUrl, hours: document.getElementById('listingHours').value.trim(),
+      isOpen: document.getElementById('listingIsOpen').checked,
+      lat, lng,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (editingListingId) {
+      await db.collection('listings').doc(editingListingId).update(data);
+      showToast('Updated', 'success');
+    } else {
+      await db.collection('listings').add({
+        ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdBy: currentUser.uid, rating: 0, reviewCount: 0
+      });
+      showToast('Published!', 'success');
+    }
+    closeAllModals(); resetAddForm();
+    await loadListings(true);
+  } catch (e) { showToast('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = editingListingId ? '<i class="fas fa-save"></i> Save' : '<i class="fas fa-paper-plane"></i> Publish'; }
+}
+
+// ==================== JOB DETAIL + APPLY ====================
+async function openJobDetail(id) {
+  const job = jobs.find(j => j.id === id);
+  if (!job) return;
+  selectedJob = job;
+  document.getElementById('jobDetailTitle').innerHTML = escapeHtml(job.title);
+  document.getElementById('jobDetailBody').innerHTML = '<div class="detail-loading"><div class="spinner"></div></div>';
+  document.getElementById('jobDetailModal').classList.add('active');
+  lockBody(true);
+
+  const applied = appliedJobs.has(job.id);
+  const sal = job.salaryMin && job.salaryMax ? `$${job.salaryMin} - $${job.salaryMax}` : (job.salaryMin ? `From $${job.salaryMin}` : 'Not specified');
+  const match = userPortfolio ? calculateMatchScore(job, userPortfolio) : null;
+  const badge = match !== null ? (() => { const m = getMatchLabel(match); return `<div style="text-align:center;margin:12px 0;"><span class="match-badge ${m.cls}"><i class="fas fa-magic"></i> ${match}% · ${m.label}</span></div>`; })() : '';
+  const skills = (job.skills || []).length ? `<div class="detail-section-title">Skills</div><div class="skill-chips">${job.skills.map(s => `<span class="skill-chip">${escapeHtml(s)}</span>`).join('')}</div>` : '';
+
+  document.getElementById('jobDetailBody').innerHTML = `
+    <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);padding:16px;border-radius:var(--r-md);margin-bottom:16px;">
+      <div style="font-size:1.15rem;font-weight:800;margin-bottom:4px;">${escapeHtml(job.title)}</div>
+      <div style="font-size:.9rem;color:var(--primary-dark);font-weight:700;"><i class="fas fa-building"></i> ${escapeHtml(job.company)}</div>
+      <div class="job-meta" style="margin-top:8px;"><span class="job-type-pill">${escapeHtml(job.type || 'Full-time')}</span><span class="job-type-pill">${escapeHtml(job.category || 'General')}</span></div>
+    </div>
+    ${badge}
+    <div class="detail-meta-grid">
+      <div class="detail-meta-item"><strong>Salary</strong><i class="fas fa-money-bill"></i>${sal}</div>
+      <div class="detail-meta-item"><strong>Location</strong><i class="fas fa-location-dot"></i>${escapeHtml(job.locationName || 'Not specified')}</div>
+    </div>
+    <div class="detail-description">${escapeHtml(job.description || '')}</div>
+    ${skills}
+    ${applied ? '<div class="info-note" style="background:#d1fae5;color:#065f46;"><i class="fas fa-check-circle"></i> You\'ve applied. Good luck!</div>' : `<button class="btn-primary" style="padding:16px;" onclick="openApplyModal('${job.id}')"><i class="fas fa-paper-plane"></i> Apply now</button>`}
+  `;
+}
+
+function openApplyModal(jobId) {
+  const job = jobs.find(j => j.id === jobId);
+  if (!job) return;
+  selectedJob = job;
+  const methods = [];
+  if (job.applyUrl) methods.push({ type: 'url', icon: 'external-link-alt', title: 'Apply on company site', desc: job.applyUrl, value: job.applyUrl });
+  if (job.applyEmail) methods.push({ type: 'email', icon: 'envelope', title: 'Send email', desc: job.applyEmail, value: job.applyEmail });
+  if (job.applyPhone) methods.push({ type: 'whatsapp', icon: 'whatsapp', title: 'Apply via WhatsApp', desc: job.applyPhone, value: job.applyPhone.replace(/\D/g, '') });
+  if (!methods.length) { showToast('No apply method', 'error'); return; }
+
+  document.getElementById('applyBody').innerHTML = `
+    <p style="font-size:.85rem;color:var(--gray-600);margin-bottom:14px;">${userPortfolio ? 'Your portfolio will be included automatically.' : 'Tip: build a portfolio first to stand out.'}</p>
+    ${methods.map(m => `<div class="apply-method" data-m="${m.type}" data-v="${escapeHtml(m.value)}"><div class="apply-icon ${m.type}"><i class="${m.type === 'whatsapp' ? 'fab' : 'fas'} fa-${m.icon}"></i></div><div class="apply-info"><div class="apply-title">${escapeHtml(m.title)}</div><div class="apply-desc">${escapeHtml(m.desc)}</div></div><i class="fas fa-chevron-right" style="color:var(--gray-400);"></i></div>`).join('')}`;
+  document.querySelectorAll('.apply-method').forEach(el => el.addEventListener('click', () => executeApply(el.dataset.m, el.dataset.v)));
+  openModalWithFocus('applyModal');
+}
+
+async function executeApply(method, value) {
+  if (!selectedJob) return;
+  const job = selectedJob;
+  const cover = userPortfolio ? `Hi, I'm ${userPortfolio.displayName} — ${userPortfolio.headline}. Skills: ${(userPortfolio.skills || []).join(', ')}.` : `Hi, I'd like to apply for the ${job.title} position at ${job.company}.`;
+  try {
+    if (method === 'url') window.open(value, '_blank');
+    else if (method === 'email') window.location.href = `mailto:${value}?subject=${encodeURIComponent('Application for ' + job.title)}&body=${encodeURIComponent(cover)}`;
+    else if (method === 'whatsapp') window.open(`https://wa.me/${value}?text=${encodeURIComponent(cover)}`, '_blank');
+    if (currentUser) {
+      await db.collection('applications').add({ userId: currentUser.uid, jobId: job.id, jobTitle: job.title, company: job.company, method, status: 'sent', appliedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      appliedJobs.add(job.id);
+      closeAllModals();
+      showToast('Application sent! 🎉', 'success', 3000);
+      renderActiveMode();
+    }
+  } catch (e) { showToast('Failed', 'error'); }
+}
+
+// ==================== POST JOB ====================
+function openPostJobModal() {
+  if (!currentUser) { showToast('Log in first', 'error'); updateProfileModal(); openModalWithFocus('profileModal'); return; }
+  ['jobTitle','jobCompany','jobDesc','jobSkills','jobSalaryMin','jobSalaryMax','jobApplyUrl','jobApplyEmail','jobApplyPhone','jobLocation'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('jobCategory').value = '';
+  document.getElementById('jobType').value = '';
+  openModalWithFocus('postJobModal');
+}
+
+async function publishJob() {
+  if (!checkRateLimit('postJob', 3)) { showToast('Too many attempts', 'error'); return; }
+  const title = document.getElementById('jobTitle').value.trim();
+  const company = document.getElementById('jobCompany').value.trim();
+  const category = document.getElementById('jobCategory').value;
+  const type = document.getElementById('jobType').value;
+  const description = document.getElementById('jobDesc').value.trim();
+  const applyUrl = document.getElementById('jobApplyUrl').value.trim();
+  const applyEmail = document.getElementById('jobApplyEmail').value.trim();
+  const applyPhone = document.getElementById('jobApplyPhone').value.trim();
+  if (!title || !company || !category || !type || !description) { showToast('Fill required fields', 'error'); return; }
+  if (!applyUrl && !applyEmail && !applyPhone) { showToast('Provide an apply method', 'error'); return; }
+  const btn = document.getElementById('publishJobBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  try {
+    const data = {
+      title, company, category, type, description,
+      skills: document.getElementById('jobSkills').value.split(',').map(s => s.trim()).filter(Boolean),
+      salaryMin: parseInt(document.getElementById('jobSalaryMin').value) || null,
+      salaryMax: parseInt(document.getElementById('jobSalaryMax').value) || null,
+      applyUrl: applyUrl || null, applyEmail: applyEmail || null, applyPhone: applyPhone || null,
+      locationName: document.getElementById('jobLocation').value.trim() || null,
+      isActive: true, createdBy: currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const ref = await db.collection('jobs').add(data);
+    jobs.unshift({ id: ref.id, ...data, createdAt: null });
+    closeAllModals();
+    renderActiveMode();
+    showToast('Job posted!', 'success');
+  } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Publish'; }
+}
+
+// ==================== PORTFOLIO ====================
+function openPortfolioEditor() {
+  if (!currentUser && !userPortfolio) { showToast('Log in first', 'error'); return; }
+  if (userPortfolio) {
+    document.getElementById('pfName').value = userPortfolio.displayName || '';
+    document.getElementById('pfHeadline').value = userPortfolio.headline || '';
+    document.getElementById('pfBio').value = userPortfolio.bio || '';
+    document.getElementById('pfYears').value = userPortfolio.experienceYears || '';
+    document.getElementById('pfEducation').value = userPortfolio.education || '';
+    document.getElementById('pfLat').value = userPortfolio.lat || '';
+    document.getElementById('pfLng').value = userPortfolio.lng || '';
+    document.getElementById('pfEmail').value = userPortfolio.email || '';
+    document.getElementById('pfPhone').value = userPortfolio.phone || '';
+    portfolioSkills = [...(userPortfolio.skills || [])];
+    document.querySelectorAll('#pfJobTypes input').forEach(cb => { cb.checked = (userPortfolio.preferredJobTypes || []).includes(cb.value); cb.closest('.checkbox-item').classList.toggle('checked', cb.checked); });
+    document.querySelectorAll('#pfCategories input').forEach(cb => { cb.checked = (userPortfolio.preferredCategories || []).includes(cb.value); cb.closest('.checkbox-item').classList.toggle('checked', cb.checked); });
+    document.getElementById('portfolioLocationPreview').innerHTML = userPortfolio.lat ? `<i class="fas fa-check-circle" style="color:var(--success);"></i> ${userPortfolio.lat.toFixed(4)}, ${userPortfolio.lng.toFixed(4)}` : 'Using current location';
+  } else {
+    ['pfName','pfHeadline','pfBio','pfYears','pfEmail','pfPhone'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('pfEducation').value = '';
+    document.getElementById('pfLat').value = ''; document.getElementById('pfLng').value = '';
+    portfolioSkills = [];
+    document.querySelectorAll('#pfJobTypes input, #pfCategories input').forEach(cb => { cb.checked = false; cb.closest('.checkbox-item').classList.remove('checked'); });
+    document.getElementById('portfolioLocationPreview').innerHTML = 'Using current location';
+  }
+  renderSkillChips();
+  openModalWithFocus('portfolioModal');
+}
+
+function renderSkillChips() {
+  const c = document.getElementById('pfSkillChips');
+  c.innerHTML = portfolioSkills.map((s, i) => `<span class="skill-chip">${escapeHtml(s)} <button type="button" data-i="${i}">&times;</button></span>`).join('');
+  c.querySelectorAll('button[data-i]').forEach(btn => btn.addEventListener('click', () => { portfolioSkills.splice(parseInt(btn.dataset.i), 1); renderSkillChips(); }));
+}
+
+async function savePortfolio() {
+  const name = document.getElementById('pfName').value.trim();
+  const headline = document.getElementById('pfHeadline').value.trim();
+  if (!name || !headline) { showToast('Name and headline required', 'error'); return; }
+  const data = {
+    userId: currentUser?.uid || 'demo', displayName: name, headline,
+    bio: document.getElementById('pfBio').value.trim(),
+    experienceYears: parseInt(document.getElementById('pfYears').value) || 0,
+    education: document.getElementById('pfEducation').value,
+    lat: parseFloat(document.getElementById('pfLat').value) || userLocation?.lat || null,
+    lng: parseFloat(document.getElementById('pfLng').value) || userLocation?.lng || null,
+    skills: portfolioSkills,
+    preferredJobTypes: Array.from(document.querySelectorAll('#pfJobTypes input:checked')).map(cb => cb.value),
+    preferredCategories: Array.from(document.querySelectorAll('#pfCategories input:checked')).map(cb => cb.value),
+    email: document.getElementById('pfEmail').value.trim() || currentUser?.email || '',
+    phone: document.getElementById('pfPhone').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  const btn = document.getElementById('savePortfolioBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  try {
+    if (currentUser) {
+      await db.collection('portfolios').doc(currentUser.uid).set(data, { merge: true });
+    }
+    userPortfolio = data;
+    closeAllModals();
+    if (activeMode === 'match') renderMatchSheet();
+    showToast('Portfolio saved! 🎯', 'success', 3000);
+  } catch (e) { 
+    userPortfolio = data;
+    closeAllModals();
+    if (activeMode === 'match') renderMatchSheet();
+    showToast('Demo Portfolio saved!', 'success', 3000);
+  }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
+}
+
+// ==================== PROFILE ====================
+async function updateProfileModal() {
+  const c = document.getElementById('profileContent');
+  if (currentUser) {
+    const my = allListings.filter(l => l.createdBy === currentUser.uid);
+    let stats = { view: 0, call: 0, whatsapp: 0 };
+    try {
+      if (my.length) {
+        const s = await db.collection('leads').where('listingId', 'in', my.slice(0, 10).map(l => l.id)).limit(300).get();
+        s.docs.forEach(d => { const t = d.data().type; if (stats[t] !== undefined) stats[t]++; });
+      }
+    } catch (e) {}
+    const name = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+    c.innerHTML = `
+      <div style="text-align:center;">
+        <div class="profile-avatar"><i class="fas fa-user"></i></div>
+        <div class="profile-email">${escapeHtml(name)}</div>
+        <div class="profile-status">${escapeHtml(currentUser.email)}</div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn-secondary" id="portfolioBtn" style="width:auto;padding:8px 14px;font-size:.75rem;"><i class="fas fa-id-card"></i> Portfolio</button>
+          <button class="btn-secondary" id="logoutBtn" style="width:auto;padding:8px 14px;font-size:.75rem;"><i class="fas fa-sign-out-alt"></i> Log out</button>
+        </div>
+      </div>
+      <div class="biz-dashboard" style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="font-size:.9rem;"><i class="fas fa-chart-line" style="color:var(--primary);"></i> Your stats</strong>
+          <span style="font-size:.7rem;font-weight:700;color:var(--gray-500);">${my.length} listings</span>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-box"><div class="num">${stats.view}</div><div class="lbl">Views</div></div>
+          <div class="stat-box"><div class="num">${stats.call + stats.whatsapp}</div><div class="lbl">Contacts</div></div>
+          <div class="stat-box"><div class="num">${favorites.length}</div><div class="lbl">Saved</div></div>
+        </div>
+      </div>`;
+    document.getElementById('logoutBtn')?.addEventListener('click', () => auth.signOut().then(() => { showToast('Logged out', 'info'); closeAllModals(); }));
+    document.getElementById('portfolioBtn')?.addEventListener('click', () => { closeAllModals(); openPortfolioEditor(); });
+  } else {
+    c.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;"><div class="profile-avatar" style="background:var(--gray-100);"><i class="fas fa-user" style="color:var(--gray-400);"></i></div><div class="profile-email" style="color:var(--gray-500);">Guest (Demo Mode)</div></div>
+      <div style="margin-bottom:20px;">
+        <label style="font-size:.78rem;text-transform:uppercase;">Login</label>
+        <div class="form-group"><input id="loginEmail" placeholder="Email" type="email"></div>
+        <div class="form-group"><input id="loginPass" type="password" placeholder="Password"></div>
+        <button class="btn-primary" id="doLoginBtn"><i class="fas fa-sign-in-alt"></i> Login</button>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
+      <div><label style="font-size:.78rem;text-transform:uppercase;">Create Account</label>
+        <div class="form-group"><input id="regName" placeholder="Display name"></div>
+        <div class="form-group"><input id="regEmail" placeholder="Email" type="email"></div>
+        <div class="form-group"><input id="regPass" type="password" placeholder="Password (min 6)"></div>
+        <button class="btn-secondary" id="doRegisterBtn" style="width:100%;"><i class="fas fa-user-plus"></i> Create Account</button>
+      </div>`;
+    document.getElementById('doLoginBtn')?.addEventListener('click', () => {
+      const e = document.getElementById('loginEmail').value, p = document.getElementById('loginPass').value;
+      if (!e || !p) return showToast('Enter email and password', 'error');
+      auth.signInWithEmailAndPassword(e, p).then(() => { showToast('Welcome!', 'success'); closeAllModals(); }).catch(err => showToast(err.message, 'error'));
+    });
+    document.getElementById('doRegisterBtn')?.addEventListener('click', async () => {
+      const n = document.getElementById('regName').value.trim();
+      const e = document.getElementById('regEmail').value, p = document.getElementById('regPass').value;
+      if (p.length < 6) return showToast('Password too short', 'error');
+      try {
+        const cred = await auth.createUserWithEmailAndPassword(e, p);
+        if (n) await cred.user.updateProfile({ displayName: n });
+        cred.user.sendEmailVerification().catch(() => {});
+        showToast('Account created!', 'success');
+        closeAllModals();
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+  }
+}
+
+// ==================== LOCATION PICKER ====================
+function startLocationPicker() {
+  if (!userLocation) { showToast('Enable location first', 'error'); return; }
+  document.getElementById('locationPickerModal').classList.add('active');
+  lockBody(true);
+  document.getElementById('tempMapContainer').innerHTML = '<div id="tempLeafletMap" style="height:300px;width:100%;"></div>';
+  setTimeout(() => {
+    if (tempPickerMap) { try { tempPickerMap.remove(); } catch(e){} tempPickerMap = null; }
+    const div = document.getElementById('tempLeafletMap');
+    if (!div) return;
+    tempPickerMap = L.map(div).setView([userLocation.lat, userLocation.lng], 15);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(tempPickerMap);
+    tempPickerMarker = L.marker([userLocation.lat, userLocation.lng], { draggable: true, icon: L.divIcon({ html: '<div style="font-size:2rem;">📍</div>', iconSize: [32, 32], iconAnchor: [16, 32] }) }).addTo(tempPickerMap);
+    tempPickerMarker.bindPopup('Drag to location').openPopup();
+    tempPickerMap.on('click', e => tempPickerMarker.setLatLng(e.latlng));
+    setTimeout(() => tempPickerMap.invalidateSize(), 350);
+  }, 100);
+}
+
+// ==================== MODAL HELPERS ====================
+function closeAllModals() {
+  document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+  if (tempPickerMap) { try { tempPickerMap.remove(); } catch(e){} tempPickerMap = null; }
+  const u = new URL(location.href); u.searchParams.delete('listing'); history.replaceState({}, '', u);
+  lockBody(false);
+}
+function openModalWithFocus(id) {
+  document.getElementById(id).classList.add('active');
+  lockBody(true);
+  setTimeout(() => document.querySelector(`#${id} input:not([type=checkbox]), #${id} select, #${id} textarea`)?.focus({ preventScroll: true }), 320);
+}
+
+// ==================== DEEP LINK ====================
+function tryHandleDeepLink() {
+  if (deepLinkHandled) return;
+  const id = new URLSearchParams(location.search).get('listing');
+  if (!id) { deepLinkHandled = true; return; }
+  const found = allListings.find(l => l.id === id);
+  if (found) {
+    deepLinkHandled = true;
+    setTimeout(() => openDetailModal(id), 400);
+  }
+}
+
+// ==================== NETWORK ====================
+function initNetwork() {
+  const b = document.getElementById('offlineBanner');
+  const u = () => b.classList.toggle('visible', !navigator.onLine);
+  window.addEventListener('online', () => { u(); showToast('Back online', 'success', 1500); loadListings(true); });
+  window.addEventListener('offline', () => { u(); showToast('Offline', 'info', 2000); });
+  u();
+}
+
+// ==================== EVENT BINDINGS ====================
+function bindEvents() {
+  document.querySelectorAll('.close-modal').forEach(b => b.addEventListener('click', closeAllModals));
+  document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeAllModals(); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && anyModalOpen()) closeAllModals(); });
+
+  document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)));
+
+  document.getElementById('filterBtn').onclick = () => openModalWithFocus('filterModal');
+  document.getElementById('deckFilterBtn').onclick = () => openModalWithFocus('filterModal');
+  document.getElementById('profileBtn').onclick = () => { updateProfileModal(); openModalWithFocus('profileModal'); };
+
+  document.getElementById('fabAdd').onclick = () => {
+    if (activeMode === 'discover') {
+      if (!currentUser) { showToast('Log in first', 'info'); updateProfileModal(); openModalWithFocus('profileModal'); return; }
+      resetAddForm(); openModalWithFocus('addListingModal');
+    } else {
+      openPostJobModal();
+    }
+  };
+
+  document.getElementById('applyFiltersBtn').onclick = () => {
+    filters.category = document.getElementById('filterCat').value;
+    filters.maxDist = parseInt(document.getElementById('filterDist').value);
+    filters.openNow = document.getElementById('openNow').checked;
+    closeAllModals();
+    renderCardDeck();
+    showToast('Filters applied', 'success', 1500);
+  };
+  document.getElementById('resetFiltersBtn').onclick = () => {
+    filters = { category: '', maxDist: 10, openNow: false };
+    document.getElementById('filterCat').value = '';
+    document.getElementById('filterDist').value = 10;
+    document.getElementById('distLabel').innerText = '10 km';
+    document.getElementById('openNow').checked = false;
+    renderCardDeck();
+    closeAllModals();
+  };
+  document.getElementById('filterDist').addEventListener('input', e => { document.getElementById('distLabel').innerText = e.target.value + ' km'; });
+
+  const si = document.getElementById('globalSearch');
+  const sc = document.getElementById('searchClear');
+  let deb;
+  si.addEventListener('input', e => {
+    sc.classList.toggle('visible', e.target.value.length > 0);
+    clearTimeout(deb);
+    deb = setTimeout(() => {
+      if (activeMode === 'discover') { searchTerm = e.target.value; renderCardDeck(); }
+      else { jobSearchTerm = e.target.value; renderActiveMode(); }
+    }, 150);
+  });
+  sc.addEventListener('click', () => {
+    si.value = ''; searchTerm = ''; jobSearchTerm = '';
+    sc.classList.remove('visible'); renderActiveMode();
+  });
+
+  document.getElementById('sheetHandle').addEventListener('click', () => {
+    const s = document.getElementById('bottomSheet');
+    const expanded = s.classList.toggle('expanded');
+    document.body.dataset.sheetExpanded = expanded ? 'true' : 'false';
+    setTimeout(() => {
+      if (map) map.invalidateSize();
+      if (userLocation) centerMap(userLocation.lat, userLocation.lng, map.getZoom(), false);
+    }, 320);
+  });
+
+  document.getElementById('publishBtn').onclick = publishListing;
+  document.getElementById('publishJobBtn').onclick = publishJob;
+  document.getElementById('savePortfolioBtn').onclick = savePortfolio;
+
+  document.querySelectorAll('#addListingModal .tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('#addListingModal .tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById(t.dataset.tab).classList.add('active');
+    document.querySelectorAll('#addListingModal .tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  }));
+
+  const ua = document.getElementById('imageUploadArea');
+  const ii = document.getElementById('imageInput');
+  const th = document.getElementById('imagePreviewThumb');
+  ua.addEventListener('click', () => ii.click());
+  ii.addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) { showToast('Max 5MB', 'error'); ii.value = ''; return; }
+    if (!f.type.startsWith('image/')) { showToast('Images only', 'error'); ii.value = ''; return; }
+    pendingImageFile = f;
+    const r = new FileReader();
+    r.onload = ev => { th.src = ev.target.result; th.style.display = 'block'; };
+    r.readAsDataURL(f);
+  });
+
+  document.getElementById('openLocationPickerBtn').onclick = () => { pickerContext = 'listing'; startLocationPicker(); };
+  document.getElementById('portfolioPickLocationBtn').onclick = () => { pickerContext = 'portfolio'; startLocationPicker(); };
+  document.getElementById('confirmPickBtn').onclick = () => {
+    if (!tempPickerMarker) return;
+    const p = tempPickerMarker.getLatLng();
+    if (pickerContext === 'portfolio') {
+      document.getElementById('pfLat').value = p.lat;
+      document.getElementById('pfLng').value = p.lng;
+      document.getElementById('portfolioLocationPreview').innerHTML = `<i class="fas fa-check-circle" style="color:var(--success);"></i> ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`;
+    } else {
+      document.getElementById('listingLat').value = p.lat;
+      document.getElementById('listingLng').value = p.lng;
+      document.getElementById('locationPreview').innerHTML = `<i class="fas fa-check-circle" style="color:var(--success);"></i> ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`;
+    }
+    document.getElementById('locationPickerModal').classList.remove('active');
+    if (tempPickerMap) { try { tempPickerMap.remove(); } catch(e){} tempPickerMap = null; }
+    if (!anyModalOpen()) lockBody(false);
+    pickerContext = 'listing';
+  };
+  document.getElementById('cancelPickBtn').onclick = () => {
+    document.getElementById('locationPickerModal').classList.remove('active');
+    if (tempPickerMap) { try { tempPickerMap.remove(); } catch(e){} tempPickerMap = null; }
+    if (!anyModalOpen()) lockBody(false);
+    pickerContext = 'listing';
+  };
+
+  document.querySelectorAll('#portfolioModal .tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('#portfolioModal .tab-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById(t.dataset.tab).classList.add('active');
+    document.querySelectorAll('#portfolioModal .tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  }));
+
+  document.getElementById('pfSkillInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const v = e.target.value.trim().replace(/,/g, '');
+      if (v && !portfolioSkills.includes(v)) { portfolioSkills.push(v); renderSkillChips(); e.target.value = ''; }
+    }
+  });
+  document.querySelectorAll('#pfJobTypes input, #pfCategories input').forEach(cb => {
+    cb.addEventListener('change', () => cb.closest('.checkbox-item').classList.toggle('checked', cb.checked));
+  });
+}
+
+// ==================== INIT ====================
+console.log('[APP] Starting Marketplace Nearby (Presentation Mode)');
+initMap();
+
+auth.onAuthStateChanged(async user => {
+  currentUser = user;
+  console.log('[AUTH] User:', user ? user.email : 'guest');
+  await loadPortfolio();
+  updateProfileModal();
+  if (activeMode === 'match') renderMatchSheet();
+});
+
+initNetwork();
+bindEvents();
+updateFavBadge();
+loadListings(true);
+</script>
+</body>
+</html>
